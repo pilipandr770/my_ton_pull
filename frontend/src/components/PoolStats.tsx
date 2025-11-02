@@ -26,6 +26,7 @@ export default function PoolStats({ apiUrl }: PoolStatsProps) {
     // Оновлюємо кожні 30 секунд
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchStats = async () => {

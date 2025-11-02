@@ -28,6 +28,7 @@ export default function UserBalance({ apiUrl, userAddress }: UserBalanceProps) {
       const interval = setInterval(fetchBalance, 10000);
       return () => clearInterval(interval);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userAddress]);
 
   const fetchBalance = async () => {
