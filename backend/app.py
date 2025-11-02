@@ -10,6 +10,7 @@
 import os
 import json
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template_string
+from flask_cors import CORS
 import stripe
 from dotenv import load_dotenv
 
@@ -22,6 +23,9 @@ stripe.api_key = STRIPE_SECRET
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-key")
+
+# Enable CORS для frontend (localhost:3000)
+CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
 
 STORAGE_FILE = os.path.join(os.path.dirname(__file__), "subscriptions.json")
 

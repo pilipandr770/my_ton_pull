@@ -2,6 +2,7 @@
 
 # Web Framework
 flask
+flask-cors
 gunicorn
 
 # Payment Processing
