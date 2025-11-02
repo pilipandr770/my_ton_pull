@@ -57,58 +57,23 @@ with app.app_context():
     except Exception as e:
         print(f"⚠️  Database setup: {e}")
 
-INDEX_HTML = """
-<h2>TON Pool — Демо</h2>
-<p>Поточний APY (mock): 9.7%</p>
-<a href="/login">Admin login</a>
-"""
+# Admin routes moved to /api/admin/* to not conflict with frontend
 
-LOGIN_HTML = """
-<h2>Admin login</h2>
-<form method="post">
-  <input type="password" name="password" placeholder="Password"/>
-  <button type="submit">Login</button>
-</form>
-"""
-
-DASH_HTML = """
-<h2>Admin dashboard</h2>
-<p>Активні підписки: {{active}}</p>
-<pre>{{store}}</pre>
-<a href="/">Back</a>
-"""
-
-@app.route("/")
-def index():
-    return render_template_string(INDEX_HTML)
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        pwd = request.form.get("password", "")
-        if pwd == ADMIN_PASSWORD:
-            session["admin"] = True
-            return redirect(url_for("dashboard"))
-        return "Невірний пароль", 403
-    return render_template_string(LOGIN_HTML)
-
-@app.route("/dashboard")
-def dashboard():
+@app.route("/api/admin/stats")
+def api_admin_stats():
+    """Admin statistics endpoint"""
     if not session.get("admin"):
-        return redirect(url_for("login"))
+        return jsonify({"error": "Unauthorized"}), 401
     
-    # Get stats from database
     total_users = User.query.count()
     active_subs = Subscription.query.filter_by(status='active').count()
     recent_txs = Transaction.query.order_by(Transaction.created_at.desc()).limit(10).all()
     
-    stats = {
+    return jsonify({
         "total_users": total_users,
         "active_subscriptions": active_subs,
-        "recent_transactions": len(recent_txs)
-    }
-    
-    return render_template_string(DASH_HTML, active=active_subs, store=json.dumps(stats, indent=2, ensure_ascii=False))
+        "recent_transactions": [tx.to_dict() for tx in recent_txs]
+    })
 
 @app.route("/stripe/webhook", methods=["POST"])
 def stripe_webhook():
@@ -240,6 +205,64 @@ def init_db():
         conn.commit()
     db.create_all()
     print("Database initialized!")
+
+# ============================================================================
+# SERVE FRONTEND STATIC FILES (Next.js)
+# ============================================================================
+
+from flask import send_from_directory, send_file
+
+# Path to frontend build
+FRONTEND_BUILD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "out")
+
+# Catch-all route for serving frontend (MUST BE LAST!)
+# Flask processes more specific routes first, so /api/* routes above won't be affected
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve Next.js static files for all non-API routes"""
+    
+    # Double-check: API and Stripe routes should be handled above
+    # This is a safety check in case routing fails
+    if path.startswith('api') or path.startswith('stripe'):
+        # These should never reach here if routes above are registered
+        return jsonify({"error": "API endpoint not found"}), 404
+    
+    # Serve static files from Next.js build
+    if path and os.path.exists(os.path.join(FRONTEND_BUILD_DIR, path)):
+        return send_from_directory(FRONTEND_BUILD_DIR, path)
+    
+    # Try with .html extension (Next.js static export adds .html)
+    html_path = os.path.join(FRONTEND_BUILD_DIR, f"{path}.html")
+    if path and os.path.exists(html_path):
+        return send_from_directory(FRONTEND_BUILD_DIR, f"{path}.html")
+    
+    # Fallback to index.html (SPA routing)
+    index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
+    if os.path.exists(index_path):
+        return send_file(index_path)
+    
+    # Frontend not built yet - show helpful message
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head><title>TON Pool - Build Required</title></head>
+    <body style="font-family: Arial; padding: 40px; max-width: 800px; margin: 0 auto;">
+        <h1>🏗️ Frontend Not Built</h1>
+        <p>The Next.js frontend hasn't been compiled yet.</p>
+        <h3>To build locally:</h3>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
+cd frontend
+npm install
+npm run build</pre>
+        <h3>On Render:</h3>
+        <p>The build script should automatically build both backend and frontend.</p>
+        <p><strong>Looking for:</strong> <code>{FRONTEND_BUILD_DIR}</code></p>
+        <hr>
+        <p>✅ Backend API is running: <a href="/api/pool/stats">Check API</a></p>
+    </body>
+    </html>
+    """, 200
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

@@ -6,7 +6,8 @@ import PoolStats from "@/components/PoolStats";
 import UserBalance from "@/components/UserBalance";
 import StakeForm from "@/components/StakeForm";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Use relative URLs for API calls (same server)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function Home() {
   const userAddress = useTonAddress();
