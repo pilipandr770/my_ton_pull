@@ -1,18 +1,20 @@
 # backend/app.py
 # Path: backend/app.py
 """
-Простий Flask бекенд:
-- Admin login (local)
+TON Staking Pool Backend
+- PostgreSQL database with separate schema 'ton_pool'
 - Stripe webhook (підписка 5 €/міс)
-- / (інфо), /login (адмін), /dashboard (захищено)
-- Mock: on-chain дані (пізніше підключимо TON indexer)
+- TON blockchain integration
+- Automatic migrations on deployment
 """
 import os
 import json
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template_string
 from flask_cors import CORS
+from flask_migrate import Migrate
 import stripe
 from dotenv import load_dotenv
+from models import db, User, Transaction, PoolStats, Subscription
 
 load_dotenv()
 STRIPE_SECRET = os.getenv("STRIPE_SECRET_KEY", "")
@@ -22,22 +24,37 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "change-me")
 stripe.api_key = STRIPE_SECRET
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-key")
+app.secret_key = os.getenv("SECRET_KEY", os.getenv("FLASK_SECRET_KEY", "super-secret-key"))
 
-# Enable CORS для frontend (localhost:3000)
-CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+# Database configuration
+database_url = os.getenv("DATABASE_URL")
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-STORAGE_FILE = os.path.join(os.path.dirname(__file__), "subscriptions.json")
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///local.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
-def load_store():
-    if not os.path.exists(STORAGE_FILE):
-        return {"customers": {}}
-    with open(STORAGE_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+# Initialize database and migrations
+db.init_app(app)
+migrate = Migrate(app, db)
 
-def save_store(data):
-    with open(STORAGE_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+# Enable CORS
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+CORS(app, origins=[frontend_url, "http://localhost:3000"], supports_credentials=True)
+
+# Create database schema on first request
+@app.before_request
+def create_schema():
+    """Create ton_pool schema if it doesn't exist"""
+    if not hasattr(app, '_schema_created'):
+        with db.engine.connect() as conn:
+            conn.execute(db.text("CREATE SCHEMA IF NOT EXISTS ton_pool"))
+            conn.commit()
+        app._schema_created = True
 
 INDEX_HTML = """
 <h2>TON Pool — Демо</h2>
@@ -78,9 +95,19 @@ def login():
 def dashboard():
     if not session.get("admin"):
         return redirect(url_for("login"))
-    store = load_store()
-    active = sum(1 for c in store["customers"].values() if c.get("status") == "active")
-    return render_template_string(DASH_HTML, active=active, store=json.dumps(store, indent=2, ensure_ascii=False))
+    
+    # Get stats from database
+    total_users = User.query.count()
+    active_subs = Subscription.query.filter_by(status='active').count()
+    recent_txs = Transaction.query.order_by(Transaction.created_at.desc()).limit(10).all()
+    
+    stats = {
+        "total_users": total_users,
+        "active_subscriptions": active_subs,
+        "recent_transactions": len(recent_txs)
+    }
+    
+    return render_template_string(DASH_HTML, active=active_subs, store=json.dumps(stats, indent=2, ensure_ascii=False))
 
 @app.route("/stripe/webhook", methods=["POST"])
 def stripe_webhook():
@@ -91,27 +118,43 @@ def stripe_webhook():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
 
-    store = load_store()
-
     if event["type"] == "invoice.payment_succeeded":
         invoice = event["data"]["object"]
         customer_id = invoice.get("customer")
         subscription_id = invoice.get("subscription")
-        if customer_id:
-            store["customers"].setdefault(customer_id, {})
-            store["customers"][customer_id].update({
-                "subscription_id": subscription_id,
-                "status": "active",
-                "last_invoice": invoice.get("id"),
-            })
-            save_store(store)
+        
+        if customer_id and subscription_id:
+            # Find or create user (for now using stripe customer_id as identifier)
+            user = User.query.filter_by(wallet_address=f"stripe_{customer_id}").first()
+            if not user:
+                user = User(wallet_address=f"stripe_{customer_id}")
+                db.session.add(user)
+                db.session.flush()
+            
+            # Create or update subscription
+            sub = Subscription.query.filter_by(stripe_subscription_id=subscription_id).first()
+            if not sub:
+                sub = Subscription(
+                    user_id=user.id,
+                    stripe_subscription_id=subscription_id,
+                    stripe_customer_id=customer_id,
+                    status='active'
+                )
+                db.session.add(sub)
+            else:
+                sub.status = 'active'
+            
+            db.session.commit()
 
     elif event["type"] == "customer.subscription.deleted":
-        sub = event["data"]["object"]
-        customer_id = sub.get("customer")
-        if customer_id and customer_id in store["customers"]:
-            store["customers"][customer_id]["status"] = "canceled"
-            save_store(store)
+        sub_data = event["data"]["object"]
+        subscription_id = sub_data.get("id")
+        
+        if subscription_id:
+            sub = Subscription.query.filter_by(stripe_subscription_id=subscription_id).first()
+            if sub:
+                sub.status = 'canceled'
+                db.session.commit()
 
     return jsonify({"status": "success"}), 200
 
@@ -188,5 +231,16 @@ def api_position(address):
     """Legacy endpoint - redirect to /api/user/:address/balance"""
     return api_user_balance(address)
 
+@app.cli.command()
+def init_db():
+    """Initialize database with schema"""
+    with db.engine.connect() as conn:
+        conn.execute(db.text("CREATE SCHEMA IF NOT EXISTS ton_pool"))
+        conn.commit()
+    db.create_all()
+    print("Database initialized!")
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    port = int(os.getenv("PORT", 8000))
+    debug = os.getenv("FLASK_ENV") != "production"
+    app.run(host="0.0.0.0", port=port, debug=debug)

@@ -1,0 +1,50 @@
+services:
+  # Backend API Service
+  - type: web
+    name: ton-pool-backend
+    runtime: python
+    region: frankfurt
+    plan: free
+    branch: master
+    rootDir: backend
+    buildCommand: "chmod +x build.sh && ./build.sh"
+    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: DATABASE_URL
+        value: postgresql://ittoken_db_user:Xm98VVSZv7cMJkopkdWRkgvZzC7Aly42@dpg-d0visga4d50c73ekmu4g-a.frankfurt-postgres.render.com/ittoken_db
+      - key: DB_SCHEMA
+        value: ton_pool
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: TON_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: STRIPE_SECRET_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false  # Set manually in Render dashboard
+      - key: TON_POOL_ADDRESS
+        value: "EQDrjaLahLkMB-hMCmkzOyBuHJ139ZUYmPHu6RRBKnbdLIYI"  # Update after deployment
+      - key: FRONTEND_URL
+        value: "https://ton-pool-frontend.onrender.com"  # Update with actual URL
+
+  # Frontend Static Site (Next.js)
+  - type: web
+    name: ton-pool-frontend
+    runtime: node
+    region: frankfurt
+    plan: free
+    branch: master
+    rootDir: frontend
+    buildCommand: "npm install && npm run build"
+    startCommand: "npx serve out -l $PORT"
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: NEXT_PUBLIC_API_URL
+        value: https://ton-pool-backend.onrender.com
+      - key: NEXT_PUBLIC_TON_MANIFEST_URL
+        value: https://ton-connect.github.io/demo-dapp-with-wallet/tonconnect-manifest.json

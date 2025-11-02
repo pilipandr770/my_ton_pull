@@ -1,19 +1,24 @@
 # backend/requirements.txt
 
 # Web Framework
-flask
-flask-cors
-gunicorn
+Flask==3.1.0
+flask-cors==5.0.0
+gunicorn==23.0.0
+
+# Database
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+psycopg2-binary==2.9.9
 
 # Payment Processing
-stripe
+stripe==10.12.0
 
 # Environment & Config
-python-dotenv
+python-dotenv==1.0.1
 
 # HTTP Requests
-requests
+requests==2.32.3
 
-# TON Blockchain (будемо встановлювати)
-# pytoniq
-# ton
+# TON Blockchain
+# pytoniq==0.1.40  # Uncomment when needed
+# tonpy==0.1.0     # Uncomment when needed
