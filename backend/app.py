@@ -46,15 +46,16 @@ migrate = Migrate(app, db)
 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 CORS(app, origins=[frontend_url, "http://localhost:3000"], supports_credentials=True)
 
-# Create database schema on first request
-@app.before_request
-def create_schema():
-    """Create ton_pool schema if it doesn't exist"""
-    if not hasattr(app, '_schema_created'):
+# Create database schema on startup
+with app.app_context():
+    try:
         with db.engine.connect() as conn:
             conn.execute(db.text("CREATE SCHEMA IF NOT EXISTS ton_pool"))
             conn.commit()
-        app._schema_created = True
+        db.create_all()
+        print("✅ Database schema 'ton_pool' ready")
+    except Exception as e:
+        print(f"⚠️  Database setup: {e}")
 
 INDEX_HTML = """
 <h2>TON Pool — Демо</h2>
