@@ -74,13 +74,16 @@ git push origin main
 ✅ Застосовано патч (validator_address = 0)  
 ✅ Створено backup оригінального коду  
 ✅ Закоммічено зміни локально  
+✅ Створено форк на GitHub: https://github.com/pilipandr770/nominator-pool  
+✅ Push патчу у форк виконано  
+✅ Remote налаштовано (origin → ваш форк, upstream → офіційний)  
 
-## Що потрібно зробити
+## Готово! ✅
 
-⏳ Створити форк на вашому GitHub (@pilipandr770/nominator-pool)  
-⏳ Замінити local clone на ваш форк  
-⏳ Push патчу у ваш форк  
-⏳ Оновити документацію з посиланням на ваш форк  
+Ваш форк з immutable патчем доступний:
+**https://github.com/pilipandr770/nominator-pool**
+
+Коміт з патчем: `acb0e7c` - "IMMUTABLE PATCH: Set validator_address to zero (0)"  
 
 ## Структура після форку
 
@@ -165,6 +168,6 @@ Test-Path ".\repo\func\new-pool.fif"
 ## Корисні посилання
 
 - **Офіційний репозиторій:** https://github.com/ton-blockchain/nominator-pool
+- **Ваш форк (з патчем):** https://github.com/pilipandr770/nominator-pool ✅
 - **TON Docs:** https://docs.ton.org/
 - **TON Dev Tools:** https://github.com/ton-community/ton-compiler
-- **Ваш форк:** https://github.com/pilipandr770/nominator-pool (створити)
