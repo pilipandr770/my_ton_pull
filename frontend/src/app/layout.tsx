@@ -3,6 +3,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,11 +19,13 @@ export default function RootLayout({
         <meta name="description" content="Стейкайте TON та отримуйте винагороди" />
       </head>
       <body className={inter.className}>
-        <TonConnectUIProvider 
-          manifestUrl="https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json"
-        >
-          {children}
-        </TonConnectUIProvider>
+        <AuthProvider>
+          <TonConnectUIProvider 
+            manifestUrl="https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json"
+          >
+            {children}
+          </TonConnectUIProvider>
+        </AuthProvider>
       </body>
     </html>
   );
