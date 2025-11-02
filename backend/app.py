@@ -212,8 +212,16 @@ def init_db():
 
 from flask import send_from_directory, send_file
 
-# Path to frontend build
-FRONTEND_BUILD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "out")
+# Path to frontend build - support both local and Render deployment
+if os.path.exists("/opt/render/project/src/frontend/out"):
+    # Render deployment path
+    FRONTEND_BUILD_DIR = "/opt/render/project/src/frontend/out"
+else:
+    # Local development path
+    FRONTEND_BUILD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "out")
+
+print(f"🎨 Frontend build directory: {FRONTEND_BUILD_DIR}")
+print(f"📂 Directory exists: {os.path.exists(FRONTEND_BUILD_DIR)}")
 
 # Catch-all route for serving frontend (MUST BE LAST!)
 # Flask processes more specific routes first, so /api/* routes above won't be affected
