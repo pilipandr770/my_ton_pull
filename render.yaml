@@ -6,7 +6,7 @@ services:
     region: frankfurt
     plan: free
     branch: master
-    buildCommand: "chmod +x build-unified.sh && ./build-unified.sh"
+    buildCommand: "python build.py"
     startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --chdir /opt/render/project/src/backend app:app"
     envVars:
       - key: PYTHON_VERSION
