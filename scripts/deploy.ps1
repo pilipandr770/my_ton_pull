@@ -1,5 +1,15 @@
+# ⚠️ TEMPLATE - Requires TON development tools
+# This script is a template for contract deployment
+# Install Blueprint or TON Compiler first
+#
 # scripts/deploy.ps1
 # Скрипт для деплою TON Pool контрактів у testnet/mainnet
+
+Write-Host "⚠️  This is a TEMPLATE script" -ForegroundColor Yellow
+Write-Host "Requires TON dev tools: Blueprint or func compiler" -ForegroundColor Yellow
+Write-Host "Install: npm install -g @ton/blueprint" -ForegroundColor Gray
+Write-Host ""
+exit 0
 
 Param(
   [string]$NETWORK = "testnet",

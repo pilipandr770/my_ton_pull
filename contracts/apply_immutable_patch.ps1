@@ -1,5 +1,13 @@
+# ⚠️ DEPRECATED - Use patch_simple.ps1 instead
+# This script is kept for reference only
+# 
 # TON Pool Immutable Patch
 # Цей скрипт застосовує зміни для створення immutable pool
+
+Write-Host "⚠️  This script is DEPRECATED" -ForegroundColor Yellow
+Write-Host "Use patch_simple.ps1 instead (already applied)" -ForegroundColor Yellow
+Write-Host ""
+exit 0
 
 Param(
     [string]$RepoPath = "C:\Users\ПК\my_ton_pull\contracts\repo",
