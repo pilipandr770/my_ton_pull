@@ -7,7 +7,7 @@ services:
     plan: free
     branch: master
     buildCommand: "pip install --upgrade pip && pip install -r backend/requirements.txt && cd frontend && npm install && npm run build && echo '✅ Frontend built' && ls -la out"
-    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --chdir /opt/render/project/src/backend app:app"
+    startCommand: "cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
