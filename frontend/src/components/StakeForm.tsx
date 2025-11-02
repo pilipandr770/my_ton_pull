@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useTonConnectUI } from "@tonconnect/ui-react";
-import { Address } from "@ton/ton";
 
 interface StakeFormProps {
   apiUrl: string;
