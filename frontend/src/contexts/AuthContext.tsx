@@ -6,7 +6,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+// API URL - empty for same domain (Render deployment) or localhost for dev
+const API_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8000' : '');
 
 interface User {
   id: number;
@@ -48,7 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchCurrentUser = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`${API_URL}/api/auth/me`, {
+      const url = API_URL ? `${API_URL}/api/auth/me` : '/api/auth/me';
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -72,7 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
+    const url = API_URL ? `${API_URL}/api/auth/login` : '/api/auth/login';
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -92,7 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (email: string, password: string) => {
-    const response = await fetch(`${API_URL}/api/auth/register`, {
+    const url = API_URL ? `${API_URL}/api/auth/register` : '/api/auth/register';
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
