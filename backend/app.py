@@ -633,26 +633,36 @@ def serve_frontend(path):
     """Serve Next.js static files for all non-API routes"""
     
     # Double-check: API and Stripe routes should be handled above
-    # This is a safety check in case routing fails
     if path.startswith('api') or path.startswith('stripe'):
-        # These should never reach here if routes above are registered
         return jsonify({"error": "API endpoint not found"}), 404
     
-    # Serve static files from Next.js build
-    if path and os.path.exists(os.path.join(FRONTEND_BUILD_DIR, path)):
+    # For root path, serve index.html
+    if not path or path == '':
+        index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
+        if os.path.exists(index_path):
+            return send_file(index_path)
+    
+    # Try exact path first (for static assets like JS, CSS, images)
+    exact_path = os.path.join(FRONTEND_BUILD_DIR, path)
+    if os.path.exists(exact_path) and os.path.isfile(exact_path):
         return send_from_directory(FRONTEND_BUILD_DIR, path)
     
-    # Try with .html extension (Next.js static export adds .html)
+    # Try with .html extension (Next.js static export)
     html_path = os.path.join(FRONTEND_BUILD_DIR, f"{path}.html")
-    if path and os.path.exists(html_path):
-        return send_from_directory(FRONTEND_BUILD_DIR, f"{path}.html")
+    if os.path.exists(html_path):
+        return send_file(html_path)
     
-    # Fallback to index.html (SPA routing)
+    # Try directory index (path/index.html)
+    dir_index = os.path.join(FRONTEND_BUILD_DIR, path, "index.html")
+    if os.path.exists(dir_index):
+        return send_file(dir_index)
+    
+    # Fallback to root index.html for client-side routing
     index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
     if os.path.exists(index_path):
         return send_file(index_path)
     
-    # Frontend not built yet - show helpful message
+    # Frontend not built yet
     return f"""
     <!DOCTYPE html>
     <html>
@@ -665,8 +675,6 @@ def serve_frontend(path):
 cd frontend
 npm install
 npm run build</pre>
-        <h3>On Render:</h3>
-        <p>The build script should automatically build both backend and frontend.</p>
         <p><strong>Looking for:</strong> <code>{FRONTEND_BUILD_DIR}</code></p>
         <hr>
         <p>✅ Backend API is running: <a href="/api/pool/stats">Check API</a></p>
