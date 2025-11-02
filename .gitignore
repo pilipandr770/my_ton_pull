@@ -61,6 +61,8 @@ wallet.pk
 *.cell
 
 # Build artifacts
+contracts/repo/
+contracts/repo_backup_*/
 contracts/repo/build/
 contracts/repo/node_modules/
 contracts/repo/dist/
