@@ -162,7 +162,8 @@ class PoolService:
                 "apy": 9.7,  # TODO: розрахувати з validator rewards
                 "pool_address": self.pool_address,
                 "status": "active",
-                "min_stake": 10,  # TODO: з контракту
+                "min_stake": 1,  # Змінено: 1 TON мінімум
+                "max_participants": 100000,  # Практично необмежено
                 "testnet": self.api.testnet
             }
         except Exception as e:

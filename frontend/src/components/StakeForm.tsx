@@ -119,15 +119,15 @@ export default function StakeForm({ apiUrl, userAddress }: StakeFormProps) {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             step="0.1"
-            min="0.1"
-            placeholder={action === "deposit" ? "Мінімум 10 TON" : "Введіть суму"}
+            min="1"
+            placeholder={action === "deposit" ? "Мінімум 1 TON" : "Введіть суму"}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
             disabled={loading}
           />
           <p className="text-xs text-gray-500 mt-1">
             {action === "deposit"
-              ? "💡 Мінімальна ставка: 10 TON"
+              ? "💡 Мінімальна ставка: 1 TON (доступно для всіх!)"
               : "💡 Виведення може зайняти до 36 годин"}
           </p>
         </div>
@@ -135,7 +135,7 @@ export default function StakeForm({ apiUrl, userAddress }: StakeFormProps) {
         {/* Quick Amount Buttons */}
         {action === "deposit" && (
           <div className="flex gap-2">
-            {[10, 50, 100, 500].map((val) => (
+            {[1, 5, 10, 50].map((val) => (
               <button
                 key={val}
                 type="button"
