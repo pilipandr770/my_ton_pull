@@ -111,22 +111,78 @@ def stripe_webhook():
 
     return jsonify({"status": "success"}), 200
 
-# TODO: /api/pool та /api/position/:address — підключити TON indexer, поки віддаємо mock
+# ============================================================================
+# TON POOL API ENDPOINTS
+# ============================================================================
+
+from ton_api import get_pool_service
+
+@app.route("/api/pool/stats")
+def api_pool_stats():
+    """Статистика пулу (total staked, APY, учасники)"""
+    try:
+        pool_service = get_pool_service()
+        stats = pool_service.get_pool_stats()
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/user/<address>/balance")
+def api_user_balance(address):
+    """Баланс користувача (wallet + staked + rewards)"""
+    try:
+        pool_service = get_pool_service()
+        balance = pool_service.get_user_balance(address)
+        return jsonify(balance)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/user/<address>/transactions")
+def api_user_transactions(address):
+    """Історія транзакцій користувача"""
+    try:
+        limit = int(request.args.get("limit", 10))
+        pool_service = get_pool_service()
+        transactions = pool_service.get_user_transactions(address, limit)
+        return jsonify({"transactions": transactions})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/transaction/prepare", methods=["POST"])
+def api_prepare_transaction():
+    """Підготовка транзакції для підпису в гаманці"""
+    try:
+        data = request.get_json()
+        tx_type = data.get("type")  # "deposit" або "withdraw"
+        user_address = data.get("address")
+        amount = float(data.get("amount", 0))
+        
+        if not user_address or amount <= 0:
+            return jsonify({"error": "Invalid parameters"}), 400
+        
+        pool_service = get_pool_service()
+        
+        if tx_type == "deposit":
+            tx_data = pool_service.prepare_deposit_transaction(user_address, amount)
+        elif tx_type == "withdraw":
+            tx_data = pool_service.prepare_withdraw_transaction(user_address, amount)
+        else:
+            return jsonify({"error": "Invalid transaction type"}), 400
+        
+        return jsonify(tx_data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Legacy endpoints (backward compatibility)
 @app.route("/api/pool")
 def api_pool():
-    return jsonify({
-        "total_pool_ton": 12345.678,
-        "total_jettons": 98765.432,
-        "apy": 0.097
-    })
+    """Legacy endpoint - redirect to /api/pool/stats"""
+    return api_pool_stats()
 
 @app.route("/api/position/<address>")
 def api_position(address):
-    return jsonify({
-        "address": address,
-        "ton": 10.0,
-        "jettons": 100.0
-    })
+    """Legacy endpoint - redirect to /api/user/:address/balance"""
+    return api_user_balance(address)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)

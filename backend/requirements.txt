@@ -1,6 +1,18 @@
 # backend/requirements.txt
+
+# Web Framework
 flask
-stripe
-python-dotenv
 gunicorn
+
+# Payment Processing
+stripe
+
+# Environment & Config
+python-dotenv
+
+# HTTP Requests
 requests
+
+# TON Blockchain (будемо встановлювати)
+# pytoniq
+# ton
