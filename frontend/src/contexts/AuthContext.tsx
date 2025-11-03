@@ -1,7 +1,7 @@
 // frontend/src/contexts/AuthContext.tsx
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -26,25 +26,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Only run on client-side
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('auth_user');
-      if (saved) {
-        try {
-          setUser(JSON.parse(saved));
-        } catch (e) {
-          console.error('Failed to parse saved user:', e);
-          localStorage.removeItem('auth_user');
-        }
-      }
-      setLoading(false);
+// Initialize user from localStorage if available
+function initializeUser(): User | null {
+  if (typeof window === 'undefined') return null;
+  const saved = localStorage.getItem('auth_user');
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error('Failed to parse saved user:', e);
+      localStorage.removeItem('auth_user');
     }
-  }, []);
+  }
+  return null;
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(() => initializeUser());
+  // Since we initialize in useState callback, loading is always false after render
+  const loading = false;
 
   function saveAuth(u: User, access: string, refresh: string) {
     setUser(u);
