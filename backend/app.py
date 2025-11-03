@@ -93,6 +93,9 @@ csp = {
         "https://ton.org",
         "https://raw.githubusercontent.com",
         "https://ton-connect.github.io",
+        "https://wallets-backend.tonhubapi.com",
+        "https://tonhub.com",
+        "https://tonkeeper.app",
     ],
     "font-src": ["'self'", "data:"],
     "script-src": [
@@ -110,6 +113,10 @@ csp = {
         "https://connect.tonhubapi.com",
         "https://tonkeeper.app",
         "https://tonhub.com",
+        "https://bridge.tonapi.io",
+        "wss://bridge.tonapi.io",
+        "https://tonapi.io",
+        "https://toncenter.com",
     ],
     "frame-ancestors": ["'none'"],
 }
