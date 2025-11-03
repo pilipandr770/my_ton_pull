@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -47,10 +47,14 @@ class ErrorBoundary extends React.Component<
 }
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  // Get the manifest URL - use absolute URL for TonConnect
-  const manifestUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/tonconnect-manifest.json`
-    : `https://my-ton-pull.onrender.com/tonconnect-manifest.json`;
+  // Compute manifest URL on client side using useMemo
+  const manifestUrl = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/tonconnect-manifest.json`;
+    }
+    // Fallback for SSR (should not be used since this is 'use client')
+    return 'https://my-ton-pull.onrender.com/tonconnect-manifest.json';
+  }, []);
 
   return (
     <ErrorBoundary>

@@ -1,12 +1,13 @@
 "use client";
 
-import { TonConnectButton, useTonAddress } from "@tonconnect/ui-react";
+import { useTonAddress } from "@tonconnect/ui-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import PoolStats from "@/components/PoolStats";
 import UserBalance from "@/components/UserBalance";
 import StakeForm from "@/components/StakeForm";
+import TonConnectButtonWrapper from "@/components/TonConnectButtonWrapper";
 import Link from "next/link";
 
 // Use relative URLs for API calls (same server)
@@ -80,7 +81,7 @@ export default function Dashboard() {
         <div className="mb-8 bg-white rounded-xl shadow-lg p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4">Швидкі дії</h2>
           <div className="flex flex-wrap gap-3">
-            <TonConnectButton />
+            <TonConnectButtonWrapper />
             {user?.role === 'admin' && (
               <Link 
                 href="/admin" 
@@ -119,7 +120,7 @@ export default function Dashboard() {
               Для початку роботи з пулом підключіть TON гаманець
             </p>
             <div className="flex justify-center">
-              <TonConnectButton />
+              <TonConnectButtonWrapper />
             </div>
           </div>
         )}
