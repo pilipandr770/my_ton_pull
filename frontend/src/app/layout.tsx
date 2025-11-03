@@ -1,11 +1,13 @@
-"use client";
-
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { TonConnectUIProvider } from "@tonconnect/ui-react";
-import { AuthProvider } from "@/contexts/AuthContext";
+import Providers from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
+
+export const metadata = {
+  title: "TON Staking Pool - Децентралізований пул",
+  description: "Стейкайте TON та отримуйте винагороди",
+};
 
 export default function RootLayout({
   children,
@@ -14,18 +16,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="uk">
-      <head>
-        <title>TON Staking Pool - Децентралізований пул</title>
-        <meta name="description" content="Стейкайте TON та отримуйте винагороди" />
-      </head>
+      <head></head>
       <body className={inter.className}>
-        <AuthProvider>
-          <TonConnectUIProvider 
-            manifestUrl="/tonconnect-manifest.json"
-          >
-            {children}
-          </TonConnectUIProvider>
-        </AuthProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
