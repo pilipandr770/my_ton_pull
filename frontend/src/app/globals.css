@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+/* TonConnect UI styles */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-text-color: #171717;
+  --tg-theme-hint-color: #999999;
+  --tg-theme-link-color: #0088cc;
+  --tg-theme-button-color: #0088cc;
+  --tg-theme-button-text-color: #ffffff;
 }
 
 @theme inline {
