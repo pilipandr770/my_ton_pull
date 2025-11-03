@@ -34,7 +34,19 @@ export default function PoolStats({ apiUrl }: PoolStatsProps) {
       const response = await fetch(`${apiUrl}/api/pool/stats`);
       if (!response.ok) throw new Error("Failed to fetch pool stats");
       const data = await response.json();
-      setStats(data);
+      
+      // Ensure all required fields exist with defaults
+      const validatedData: PoolStatsData = {
+        total_staked: data.total_staked ?? 0,
+        total_staked_usd: data.total_staked_usd ?? 0,
+        participants_count: data.participants_count ?? 0,
+        apy: data.apy ?? 0,
+        min_stake: data.min_stake ?? 0,
+        status: data.status ?? 'active',
+        testnet: data.testnet ?? false,
+      };
+      
+      setStats(validatedData);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -85,10 +97,10 @@ export default function PoolStats({ apiUrl }: PoolStatsProps) {
         <div>
           <p className="text-sm text-gray-500 mb-1">Всього застейкано</p>
           <p className="text-2xl font-bold text-gray-900">
-            {stats.total_staked.toLocaleString()} TON
+            {(stats.total_staked ?? 0).toLocaleString()} TON
           </p>
           <p className="text-sm text-gray-400">
-            ${stats.total_staked_usd.toLocaleString()}
+            ${(stats.total_staked_usd ?? 0).toLocaleString()}
           </p>
         </div>
 

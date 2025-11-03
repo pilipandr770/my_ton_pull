@@ -36,7 +36,18 @@ export default function UserBalance({ apiUrl, userAddress }: UserBalanceProps) {
       const response = await fetch(`${apiUrl}/api/user/${userAddress}/balance`);
       if (!response.ok) throw new Error("Failed to fetch balance");
       const data = await response.json();
-      setBalance(data);
+      
+      // Ensure all required fields exist with defaults
+      const validatedData: UserBalanceData = {
+        user_address: data.user_address ?? userAddress,
+        wallet_balance: data.wallet_balance ?? 0,
+        staked_amount: data.staked_amount ?? 0,
+        accumulated_rewards: data.accumulated_rewards ?? 0,
+        jettons_balance: data.jettons_balance ?? 0,
+        share_percentage: data.share_percentage ?? 0,
+      };
+      
+      setBalance(validatedData);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -80,7 +91,7 @@ export default function UserBalance({ apiUrl, userAddress }: UserBalanceProps) {
           <div>
             <p className="text-sm text-gray-600">Баланс гаманця</p>
             <p className="text-2xl font-bold text-gray-900">
-              {balance.wallet_balance.toLocaleString()} TON
+              {(balance.wallet_balance ?? 0).toLocaleString()} TON
             </p>
           </div>
           <div className="text-4xl">💳</div>
@@ -91,7 +102,7 @@ export default function UserBalance({ apiUrl, userAddress }: UserBalanceProps) {
           <div>
             <p className="text-sm text-gray-600">Застейкано</p>
             <p className="text-2xl font-bold text-green-700">
-              {balance.staked_amount.toLocaleString()} TON
+              {(balance.staked_amount ?? 0).toLocaleString()} TON
             </p>
           </div>
           <div className="text-4xl">🔒</div>
@@ -102,19 +113,19 @@ export default function UserBalance({ apiUrl, userAddress }: UserBalanceProps) {
           <div>
             <p className="text-sm text-gray-600">Накопичені винагороди</p>
             <p className="text-2xl font-bold text-yellow-700">
-              {balance.accumulated_rewards.toLocaleString()} TON
+              {(balance.accumulated_rewards ?? 0).toLocaleString()} TON
             </p>
           </div>
           <div className="text-4xl">⭐</div>
         </div>
 
         {/* Share Percentage */}
-        {balance.share_percentage > 0 && (
+        {(balance.share_percentage ?? 0) > 0 && (
           <div className="flex justify-between items-center p-4 bg-purple-50 rounded-lg">
             <div>
               <p className="text-sm text-gray-600">Ваша частка в пулі</p>
               <p className="text-2xl font-bold text-purple-700">
-                {balance.share_percentage.toFixed(2)}%
+                {(balance.share_percentage ?? 0).toFixed(2)}%
               </p>
             </div>
             <div className="text-4xl">📊</div>
@@ -126,7 +137,7 @@ export default function UserBalance({ apiUrl, userAddress }: UserBalanceProps) {
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">Загальна вартість:</span>
             <span className="text-xl font-bold text-gray-900">
-              {totalValue.toLocaleString()} TON
+              {(totalValue ?? 0).toLocaleString()} TON
             </span>
           </div>
         </div>
