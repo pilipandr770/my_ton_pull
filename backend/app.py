@@ -97,45 +97,6 @@ def add_claims(identity):
         'subscription_status': user.subscription_status if user else 'inactive'
     }
 
-# ----------------------- STATIC FRONTEND ROUTES ------------------------------
-# 1) Next.js static assets
-@app.route("/_next/<path:filename>")
-def next_static(filename):
-    folder = FRONTEND_OUT / "_next"
-    return send_from_directory(folder, filename, conditional=True)
-
-# 2) Static files in root
-@app.route("/favicon.ico")
-def favicon():
-    return send_from_directory(FRONTEND_OUT, "favicon.ico", conditional=True)
-
-@app.route("/tonconnect-manifest.json")
-def ton_manifest():
-    return send_from_directory(FRONTEND_OUT, "tonconnect-manifest.json", conditional=True)
-
-# 3) Pages
-@app.route("/dashboard")
-def dashboard_page():
-    return send_from_directory(FRONTEND_OUT / "dashboard", "index.html", conditional=True)
-
-@app.route("/login")
-def login_page_html():
-    return send_from_directory(FRONTEND_OUT / "login", "index.html", conditional=True)
-
-@app.route("/register")
-def register_page_html():
-    return send_from_directory(FRONTEND_OUT / "register", "index.html", conditional=True)
-
-# 4) Root
-@app.route("/")
-def index_html():
-    return send_from_directory(FRONTEND_OUT, "index.html", conditional=True)
-
-# --- Healthcheck -----
-@app.get("/health")
-def health():
-    return jsonify({"ok": True, "service": "TON Pool", "time": datetime.utcnow().isoformat()}), 200
-
 # ----------------------------- API ROUTES -----------------------------------
 @app.post("/api/auth/register")
 def register():
@@ -314,6 +275,58 @@ def api_position(address: str):
         "ton": 10.0,
         "jettons": 100.0
     }), 200
+
+
+# ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
+# Healthcheck
+@app.get("/health")
+def health():
+    return jsonify({"ok": True, "service": "TON Pool", "time": datetime.utcnow().isoformat()}), 200
+
+# 1) Next.js static assets
+@app.route("/_next/<path:filename>")
+def next_static(filename):
+    folder = FRONTEND_OUT / "_next"
+    return send_from_directory(folder, filename, conditional=True)
+
+# 2) Static files in root
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(FRONTEND_OUT, "favicon.ico", conditional=True)
+
+@app.route("/tonconnect-manifest.json")
+def ton_manifest():
+    return send_from_directory(FRONTEND_OUT, "tonconnect-manifest.json", conditional=True)
+
+# 3) Pages - explicit routes BEFORE catch-all
+@app.route("/dashboard")
+def dashboard_page():
+    index_path = FRONTEND_OUT / "dashboard" / "index.html"
+    if index_path.exists():
+        return send_file(index_path)
+    return jsonify({"error": "not found"}), 404
+
+@app.route("/login")
+def login_page_html():
+    index_path = FRONTEND_OUT / "login" / "index.html"
+    if index_path.exists():
+        return send_file(index_path)
+    return jsonify({"error": "not found"}), 404
+
+@app.route("/register")
+def register_page_html():
+    index_path = FRONTEND_OUT / "register" / "index.html"
+    if index_path.exists():
+        return send_file(index_path)
+    return jsonify({"error": "not found"}), 404
+
+# 4) Root index
+@app.route("/")
+def index_html():
+    index_path = FRONTEND_OUT / "index.html"
+    if index_path.exists():
+        return send_file(index_path)
+    return jsonify({"error": "Frontend not found"}), 404
 
 
 # --- Init DB ---
