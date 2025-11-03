@@ -395,10 +395,23 @@ def favicon():
     result = serve_static_file(FRONTEND_OUT / "favicon.ico", 'image/x-icon')
     return result if result else ("", 404)
 
-@app.route("/tonconnect-manifest.json")
+@app.route("/tonconnect-manifest.json", methods=['GET', 'OPTIONS'])
 def ton_manifest():
+    if request.method == 'OPTIONS':
+        response = Response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response, 200
+    
     result = serve_static_file(FRONTEND_OUT / "tonconnect-manifest.json", 'application/json')
-    return result if result else (jsonify({"error": "not found"}), 404)
+    if result:
+        # Add explicit CORS headers for manifest
+        result.headers['Access-Control-Allow-Origin'] = '*'
+        result.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        result.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return result
+    return (jsonify({"error": "not found"}), 404)
 
 # 3) Pages - explicit routes BEFORE catch-all
 @app.route("/dashboard")
