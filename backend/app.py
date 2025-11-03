@@ -315,13 +315,15 @@ def prepare_transaction():
     # Return a mock transaction object
     # In production, this would prepare a real blockchain transaction
     return jsonify({
-        "tx_id": f"tx_{hash(address + str(amount)):",
+        "tx_id": f"tx_{hash(address + str(amount))}",
         "action": action,
         "amount": amount,
         "address": address,
         "status": "pending",
         "created_at": datetime.utcnow().isoformat()
-    }), 200# ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
+    }), 200
+
+# ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
 # Healthcheck
 @app.get("/health")
 def health():
