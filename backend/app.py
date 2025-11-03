@@ -49,24 +49,17 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Enable CORS
 CORS(app, supports_credentials=True)
 
-# Security headers
-csp = {
-    'default-src': ["'self'"],
-    'script-src': ["'self'"],
-    'connect-src': ["'self'", "https://api.stripe.com"],
-    'img-src': ["'self'", "data:"],
-    'style-src': ["'self'", "'unsafe-inline'"],
-    'frame-ancestors': ["'none'"],
-}
-Talisman(
-    app,
-    content_security_policy=csp,
-    strict_transport_security=True,
-    force_https=(os.getenv("FLASK_ENV") == "production"),
-    frame_options='DENY',
-    referrer_policy='no-referrer',
-    session_cookie_secure=(os.getenv("FLASK_ENV") == "production")
-)
+# Security headers - DISABLED Talisman for now (conflicts with frontend serving)
+# TODO: Re-enable with proper CSP after testing
+# csp = {
+#     'default-src': ["'self'"],
+#     'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+#     'connect-src': ["'self'", "https://api.stripe.com", "https://*.ton.org"],
+#     'img-src': ["'self'", "data:", "https:"],
+#     'style-src': ["'self'", "'unsafe-inline'"],
+# }
+# if os.getenv("FLASK_ENV") == "production":
+#     Talisman(app, content_security_policy=csp, force_https=False)
 
 # --- Init DB & JWT -----------------------------------------------------------
 db.init_app(app)
@@ -234,6 +227,58 @@ def bootstrap_admin():
     db.session.add(u)
     db.session.commit()
     return jsonify({"ok": True}), 200
+
+# --- Old API compatibility (dashboard expects these) -------------------------
+@app.get("/api/pool/stats")
+def api_pool_stats():
+    """Compatibility with old dashboard"""
+    return api_pool()
+
+@app.get("/api/user/<address>/balance")
+def api_user_balance(address: str):
+    """Compatibility with old dashboard"""
+    return api_position(address)
+
+# --- Frontend serving ---------------------------------------------------------
+from flask import send_from_directory, send_file
+
+FRONTEND_BUILD_DIR = "/opt/render/project/src/frontend/out" if os.path.exists("/opt/render/project/src/frontend/out") else os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "out")
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve Next.js static files"""
+    # API routes handled above
+    if path.startswith('api') or path.startswith('stripe'):
+        return jsonify({"error": "Not found"}), 404
+    
+    # Root path
+    if not path or path == '':
+        index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
+        if os.path.exists(index_path):
+            return send_file(index_path)
+    
+    # Exact path (static assets)
+    exact_path = os.path.join(FRONTEND_BUILD_DIR, path)
+    if os.path.exists(exact_path) and os.path.isfile(exact_path):
+        return send_from_directory(FRONTEND_BUILD_DIR, path)
+    
+    # Try with .html
+    html_path = os.path.join(FRONTEND_BUILD_DIR, f"{path}.html")
+    if os.path.exists(html_path):
+        return send_file(html_path)
+    
+    # Try directory index
+    dir_index = os.path.join(FRONTEND_BUILD_DIR, path, "index.html")
+    if os.path.exists(dir_index):
+        return send_file(dir_index)
+    
+    # Fallback to root index
+    index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
+    if os.path.exists(index_path):
+        return send_file(index_path)
+    
+    return jsonify({"error": "Frontend not built"}), 404
 
 # --- Main --------------------------------------------------------------------
 with app.app_context():
