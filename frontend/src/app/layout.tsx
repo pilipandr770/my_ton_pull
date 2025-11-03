@@ -21,7 +21,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <TonConnectUIProvider 
-            manifestUrl="https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json"
+            manifestUrl="/tonconnect-manifest.json"
           >
             {children}
           </TonConnectUIProvider>
