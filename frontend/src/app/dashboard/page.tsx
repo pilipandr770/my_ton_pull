@@ -25,6 +25,11 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, loading, router]);
 
+  // Log address changes for debugging
+  useEffect(() => {
+    console.log('📍 Dashboard - userAddress changed:', userAddress);
+  }, [userAddress]);
+
   const handleLogout = () => {
     logout();
     router.push('/');
