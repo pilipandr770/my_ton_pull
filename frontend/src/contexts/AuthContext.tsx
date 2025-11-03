@@ -42,9 +42,17 @@ function initializeUser(): User | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => initializeUser());
-  // Since we initialize in useState callback, loading is always false after render
-  const loading = false;
+  const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  // Initialize user only on client side after mount
+  React.useEffect(() => {
+    const savedUser = initializeUser();
+    setUser(savedUser);
+    setMounted(true);
+  }, []);
+
+  const loading = !mounted;
 
   function saveAuth(u: User, access: string, refresh: string) {
     setUser(u);
