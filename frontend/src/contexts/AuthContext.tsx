@@ -18,6 +18,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   hasActiveSubscription: boolean;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -27,11 +28,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem('auth_user');
-    if (saved) {
-      setUser(JSON.parse(saved));
+    // Only run on client-side
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('auth_user');
+      if (saved) {
+        try {
+          setUser(JSON.parse(saved));
+        } catch (e) {
+          console.error('Failed to parse saved user:', e);
+          localStorage.removeItem('auth_user');
+        }
+      }
+      setLoading(false);
     }
   }, []);
 
@@ -76,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
     hasActiveSubscription: user?.subscription_status === 'active',
+    loading,
     login, register, logout
   };
 
