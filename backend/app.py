@@ -40,11 +40,20 @@ app.config['SECRET_KEY'] = SECRET_KEY
 
 # DB config: Render Postgres or local SQLite
 if DATABASE_URL:
-    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    db_uri = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    # Add SSL mode for Render PostgreSQL if not already present
+    if "postgresql://" in db_uri and "sslmode" not in db_uri:
+        separator = "&" if "?" in db_uri else "?"
+        db_uri += f"{separator}sslmode=require"
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///ton_pool.db"
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
 # Enable CORS
 CORS(app, supports_credentials=True)

@@ -10,8 +10,13 @@ from dotenv import load_dotenv
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "").replace("postgres://", "postgresql://")
 
+# Add SSL mode for Render PostgreSQL
+if "sslmode" not in DATABASE_URL:
+    separator = "&" if "?" in DATABASE_URL else "?"
+    DATABASE_URL += f"{separator}sslmode=require"
+
 print("🔧 Connecting to database...")
-conn = psycopg2.connect(DATABASE_URL)
+conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 cur = conn.cursor()
 
 try:
