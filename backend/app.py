@@ -333,11 +333,18 @@ def ton_manifest():
 @app.route("/dashboard")
 def dashboard_page():
     try:
+        # Try direct index.html first
         index_path = FRONTEND_OUT / "dashboard" / "index.html"
+        if not index_path.exists():
+            # Try dashboard.html (Next export creates this)
+            index_path = FRONTEND_OUT / "dashboard.html"
+        
         if index_path.exists():
             print(f"✅ Serving /dashboard from {index_path}")
-            return send_from_directory(str(index_path.parent), "index.html")
-        print(f"❌ Not found: {index_path}")
+            return send_from_directory(str(index_path.parent), index_path.name)
+        
+        print(f"❌ Not found: {FRONTEND_OUT / 'dashboard' / 'index.html'}")
+        print(f"❌ Not found: {FRONTEND_OUT / 'dashboard.html'}")
         return jsonify({"error": "not found"}), 404
     except Exception as e:
         print(f"❌ Error serving /dashboard: {e}")
@@ -347,8 +354,11 @@ def dashboard_page():
 def login_page_html():
     try:
         index_path = FRONTEND_OUT / "login" / "index.html"
+        if not index_path.exists():
+            index_path = FRONTEND_OUT / "login.html"
+        
         if index_path.exists():
-            return send_from_directory(str(index_path.parent), "index.html")
+            return send_from_directory(str(index_path.parent), index_path.name)
         return jsonify({"error": "not found"}), 404
     except Exception as e:
         print(f"❌ Error serving /login: {e}")
@@ -358,8 +368,11 @@ def login_page_html():
 def register_page_html():
     try:
         index_path = FRONTEND_OUT / "register" / "index.html"
+        if not index_path.exists():
+            index_path = FRONTEND_OUT / "register.html"
+        
         if index_path.exists():
-            return send_from_directory(str(index_path.parent), "index.html")
+            return send_from_directory(str(index_path.parent), index_path.name)
         return jsonify({"error": "not found"}), 404
     except Exception as e:
         print(f"❌ Error serving /register: {e}")
@@ -371,6 +384,7 @@ def index_html():
     try:
         index_path = FRONTEND_OUT / "index.html"
         if index_path.exists():
+            print(f"✅ Serving / from {index_path}")
             return send_from_directory(str(index_path.parent), "index.html")
         return jsonify({"error": "Frontend not found"}), 404
     except Exception as e:
