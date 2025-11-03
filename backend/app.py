@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, Response
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_jwt_extended import (
@@ -306,7 +306,7 @@ def health():
 
 # Helper function to serve files with proper MIME types and headers
 def serve_static_file(file_path, mime_type=None):
-    """Serve a file with proper headers, ensuring content is not empty"""
+    """Serve a file by reading content directly and returning as Response"""
     if not isinstance(file_path, Path):
         file_path = Path(file_path)
     
@@ -319,18 +319,17 @@ def serve_static_file(file_path, mime_type=None):
         
         if not content:
             print(f"⚠️  Warning: File is empty: {file_path}")
+            return None
         
-        response = send_file(
-            file_path,
-            mimetype=mime_type,
-            as_attachment=False,
-            download_name=file_path.name
-        )
-        # Add cache headers
+        # Create response with actual content
+        response = Response(content, mimetype=mime_type or 'application/octet-stream')
         response.headers['Cache-Control'] = 'public, max-age=3600'
+        response.headers['Content-Length'] = len(content)
+        
+        print(f"✅ Served {file_path.name} ({len(content)} bytes)")
         return response
     except Exception as e:
-        print(f"❌ Error reading file {file_path}: {e}")
+        print(f"❌ Error serving file {file_path}: {e}")
         return None
 
 # 1) Next.js static assets
