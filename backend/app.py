@@ -297,8 +297,31 @@ def api_position(address: str):
         "jettons": 100.0
     }), 200
 
-
-# ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
+# Transaction endpoints
+@app.post("/api/transaction/prepare")
+def prepare_transaction():
+    """Prepare a transaction (stake or unstake)"""
+    data = request.get_json(force=True)
+    action = data.get("action", "").lower()  # "stake" or "unstake"
+    amount = data.get("amount", 0)
+    address = data.get("address", "")
+    
+    if not action or not amount or not address:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    if action not in ["stake", "unstake"]:
+        return jsonify({"error": "Invalid action"}), 400
+    
+    # Return a mock transaction object
+    # In production, this would prepare a real blockchain transaction
+    return jsonify({
+        "tx_id": f"tx_{hash(address + str(amount)):",
+        "action": action,
+        "amount": amount,
+        "address": address,
+        "status": "pending",
+        "created_at": datetime.utcnow().isoformat()
+    }), 200# ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
 # Healthcheck
 @app.get("/health")
 def health():
