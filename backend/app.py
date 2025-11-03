@@ -34,8 +34,29 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 stripe.api_key = STRIPE_SECRET
 
 # Абсолютний шлях до зібраного фронтенду (Next export)
+# На локальній машині: /path/to/backend/../frontend/out
+# На Render: /opt/render/project/src/backend/../frontend/out = /opt/render/project/src/frontend/out
 BACKEND_DIR = Path(__file__).resolve().parent
 FRONTEND_OUT = (BACKEND_DIR / "../frontend/out").resolve()
+
+# Fallback якщо FRONTEND_OUT не існує
+if not FRONTEND_OUT.exists():
+    print(f"⚠️  FRONTEND_OUT не знайдено: {FRONTEND_OUT}")
+    print(f"📁 BACKEND_DIR: {BACKEND_DIR}")
+    print(f"📁 Досліджуємо батьківськукаталог...")
+    # Спробуємо знайти frontend/out в інших місцях
+    alternatives = [
+        BACKEND_DIR.parent / "frontend" / "out",
+        Path("/opt/render/project/src/frontend/out"),
+        Path("/opt/render/project/src") / "frontend" / "out",
+    ]
+    for alt in alternatives:
+        if alt.exists():
+            print(f"✅ Знайдено альтернативний шлях: {alt}")
+            FRONTEND_OUT = alt
+            break
+else:
+    print(f"✅ FRONTEND_OUT знайдено: {FRONTEND_OUT}")
 
 # --- App ---------------------------------------------------------------------
 app = Flask(__name__, static_folder=str(FRONTEND_OUT), static_url_path="")
@@ -287,46 +308,75 @@ def health():
 @app.route("/_next/<path:filename>")
 def next_static(filename):
     folder = FRONTEND_OUT / "_next"
-    return send_from_directory(folder, filename, conditional=True)
+    try:
+        return send_from_directory(str(folder), filename, conditional=True)
+    except Exception as e:
+        print(f"❌ Error serving /_next/{filename}: {e}")
+        return jsonify({"error": "not found"}), 404
 
 # 2) Static files in root
 @app.route("/favicon.ico")
 def favicon():
-    return send_from_directory(FRONTEND_OUT, "favicon.ico", conditional=True)
+    try:
+        return send_from_directory(str(FRONTEND_OUT), "favicon.ico", conditional=True)
+    except:
+        return "", 404
 
 @app.route("/tonconnect-manifest.json")
 def ton_manifest():
-    return send_from_directory(FRONTEND_OUT, "tonconnect-manifest.json", conditional=True)
+    try:
+        return send_from_directory(str(FRONTEND_OUT), "tonconnect-manifest.json", conditional=True)
+    except:
+        return jsonify({"error": "not found"}), 404
 
 # 3) Pages - explicit routes BEFORE catch-all
 @app.route("/dashboard")
 def dashboard_page():
-    index_path = FRONTEND_OUT / "dashboard" / "index.html"
-    if index_path.exists():
-        return send_file(index_path)
-    return jsonify({"error": "not found"}), 404
+    try:
+        index_path = FRONTEND_OUT / "dashboard" / "index.html"
+        if index_path.exists():
+            print(f"✅ Serving /dashboard from {index_path}")
+            return send_from_directory(str(index_path.parent), "index.html")
+        print(f"❌ Not found: {index_path}")
+        return jsonify({"error": "not found"}), 404
+    except Exception as e:
+        print(f"❌ Error serving /dashboard: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/login")
 def login_page_html():
-    index_path = FRONTEND_OUT / "login" / "index.html"
-    if index_path.exists():
-        return send_file(index_path)
-    return jsonify({"error": "not found"}), 404
+    try:
+        index_path = FRONTEND_OUT / "login" / "index.html"
+        if index_path.exists():
+            return send_from_directory(str(index_path.parent), "index.html")
+        return jsonify({"error": "not found"}), 404
+    except Exception as e:
+        print(f"❌ Error serving /login: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/register")
 def register_page_html():
-    index_path = FRONTEND_OUT / "register" / "index.html"
-    if index_path.exists():
-        return send_file(index_path)
-    return jsonify({"error": "not found"}), 404
+    try:
+        index_path = FRONTEND_OUT / "register" / "index.html"
+        if index_path.exists():
+            return send_from_directory(str(index_path.parent), "index.html")
+        return jsonify({"error": "not found"}), 404
+    except Exception as e:
+        print(f"❌ Error serving /register: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # 4) Root index
 @app.route("/")
 def index_html():
-    index_path = FRONTEND_OUT / "index.html"
-    if index_path.exists():
-        return send_file(index_path)
-    return jsonify({"error": "Frontend not found"}), 404
+    try:
+        index_path = FRONTEND_OUT / "index.html"
+        if index_path.exists():
+            return send_from_directory(str(index_path.parent), "index.html")
+        return jsonify({"error": "Frontend not found"}), 404
+    except Exception as e:
+        print(f"❌ Error serving /: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 
 # --- Init DB ---
