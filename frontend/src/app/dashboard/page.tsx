@@ -1,7 +1,6 @@
 "use client";
 
 import { TonConnectButton, useTonAddress } from "@tonconnect/ui-react";
-import { useEffect, useState } from "react";
 import PoolStats from "@/components/PoolStats";
 import UserBalance from "@/components/UserBalance";
 import StakeForm from "@/components/StakeForm";
@@ -11,17 +10,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function Home() {
   const userAddress = useTonAddress();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    // This runs only once on mount to prevent hydration mismatch
-    const timer = setTimeout(() => setMounted(true), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!mounted) {
-    return null; // Avoid hydration mismatch
-  }
+  // TonConnect already handles hydration safely, no need for mounted state
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
