@@ -304,30 +304,70 @@ def api_position(address: str):
 def health():
     return jsonify({"ok": True, "service": "TON Pool", "time": datetime.utcnow().isoformat()}), 200
 
+# Helper function to serve files with proper MIME types and headers
+def serve_static_file(file_path, mime_type=None):
+    """Serve a file with proper headers, ensuring content is not empty"""
+    if not isinstance(file_path, Path):
+        file_path = Path(file_path)
+    
+    if not file_path.exists():
+        return None
+    
+    try:
+        with open(file_path, 'rb') as f:
+            content = f.read()
+        
+        if not content:
+            print(f"⚠️  Warning: File is empty: {file_path}")
+        
+        response = send_file(
+            file_path,
+            mimetype=mime_type,
+            as_attachment=False,
+            download_name=file_path.name
+        )
+        # Add cache headers
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        return response
+    except Exception as e:
+        print(f"❌ Error reading file {file_path}: {e}")
+        return None
+
 # 1) Next.js static assets
 @app.route("/_next/<path:filename>")
 def next_static(filename):
-    folder = FRONTEND_OUT / "_next"
-    try:
-        return send_from_directory(str(folder), filename, conditional=True)
-    except Exception as e:
-        print(f"❌ Error serving /_next/{filename}: {e}")
+    file_path = FRONTEND_OUT / "_next" / filename
+    if not file_path.exists():
+        print(f"❌ Not found: {file_path}")
         return jsonify({"error": "not found"}), 404
+    
+    # Determine MIME type
+    mime_types = {
+        '.js': 'application/javascript',
+        '.css': 'text/css',
+        '.woff2': 'font/woff2',
+        '.woff': 'font/woff',
+        '.ttf': 'font/ttf',
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+    }
+    
+    suffix = Path(filename).suffix.lower()
+    mime_type = mime_types.get(suffix, 'application/octet-stream')
+    
+    result = serve_static_file(file_path, mime_type)
+    return result if result else (jsonify({"error": "error"}), 500)
 
 # 2) Static files in root
 @app.route("/favicon.ico")
 def favicon():
-    try:
-        return send_from_directory(str(FRONTEND_OUT), "favicon.ico", conditional=True)
-    except:
-        return "", 404
+    result = serve_static_file(FRONTEND_OUT / "favicon.ico", 'image/x-icon')
+    return result if result else ("", 404)
 
 @app.route("/tonconnect-manifest.json")
 def ton_manifest():
-    try:
-        return send_from_directory(str(FRONTEND_OUT), "tonconnect-manifest.json", conditional=True)
-    except:
-        return jsonify({"error": "not found"}), 404
+    result = serve_static_file(FRONTEND_OUT / "tonconnect-manifest.json", 'application/json')
+    return result if result else (jsonify({"error": "not found"}), 404)
 
 # 3) Pages - explicit routes BEFORE catch-all
 @app.route("/dashboard")
@@ -341,7 +381,8 @@ def dashboard_page():
         
         if index_path.exists():
             print(f"✅ Serving /dashboard from {index_path}")
-            return send_from_directory(str(index_path.parent), index_path.name)
+            result = serve_static_file(index_path, 'text/html')
+            return result if result else (jsonify({"error": "error"}), 500)
         
         print(f"❌ Not found: {FRONTEND_OUT / 'dashboard' / 'index.html'}")
         print(f"❌ Not found: {FRONTEND_OUT / 'dashboard.html'}")
@@ -358,7 +399,8 @@ def login_page_html():
             index_path = FRONTEND_OUT / "login.html"
         
         if index_path.exists():
-            return send_from_directory(str(index_path.parent), index_path.name)
+            result = serve_static_file(index_path, 'text/html')
+            return result if result else (jsonify({"error": "error"}), 500)
         return jsonify({"error": "not found"}), 404
     except Exception as e:
         print(f"❌ Error serving /login: {e}")
@@ -372,7 +414,8 @@ def register_page_html():
             index_path = FRONTEND_OUT / "register.html"
         
         if index_path.exists():
-            return send_from_directory(str(index_path.parent), index_path.name)
+            result = serve_static_file(index_path, 'text/html')
+            return result if result else (jsonify({"error": "error"}), 500)
         return jsonify({"error": "not found"}), 404
     except Exception as e:
         print(f"❌ Error serving /register: {e}")
@@ -385,7 +428,8 @@ def index_html():
         index_path = FRONTEND_OUT / "index.html"
         if index_path.exists():
             print(f"✅ Serving / from {index_path}")
-            return send_from_directory(str(index_path.parent), "index.html")
+            result = serve_static_file(index_path, 'text/html')
+            return result if result else (jsonify({"error": "error"}), 500)
         return jsonify({"error": "Frontend not found"}), 404
     except Exception as e:
         print(f"❌ Error serving /: {e}")
