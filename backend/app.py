@@ -332,7 +332,7 @@ def serve_static_file(file_path, mime_type=None):
         print(f"❌ Error serving file {file_path}: {e}")
         return None
 
-# 1) Next.js static assets
+# 1) Next.js static assets - handle nested paths
 @app.route("/_next/<path:filename>")
 def next_static(filename):
     file_path = FRONTEND_OUT / "_next" / filename
@@ -340,22 +340,29 @@ def next_static(filename):
         print(f"❌ Not found: {file_path}")
         return jsonify({"error": "not found"}), 404
     
-    # Determine MIME type
+    # Determine MIME type based on file extension
     mime_types = {
-        '.js': 'application/javascript',
-        '.css': 'text/css',
+        '.js': 'application/javascript; charset=utf-8',
+        '.mjs': 'application/javascript; charset=utf-8',
+        '.css': 'text/css; charset=utf-8',
         '.woff2': 'font/woff2',
         '.woff': 'font/woff',
         '.ttf': 'font/ttf',
         '.svg': 'image/svg+xml',
         '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.map': 'application/json',
     }
     
     suffix = Path(filename).suffix.lower()
     mime_type = mime_types.get(suffix, 'application/octet-stream')
     
     result = serve_static_file(file_path, mime_type)
-    return result if result else (jsonify({"error": "error"}), 500)
+    if result:
+        return result
+    return ("", 404)
 
 # 2) Static files in root
 @app.route("/favicon.ico")
