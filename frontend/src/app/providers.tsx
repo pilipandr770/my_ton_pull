@@ -47,11 +47,16 @@ class ErrorBoundary extends React.Component<
 }
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  // Get the manifest URL - use absolute URL for TonConnect
+  const manifestUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/tonconnect-manifest.json`
+    : `https://my-ton-pull.onrender.com/tonconnect-manifest.json`;
+
   return (
     <ErrorBoundary>
       <AuthProvider>
         <TonConnectUIProvider 
-          manifestUrl="/tonconnect-manifest.json"
+          manifestUrl={manifestUrl}
         >
           {children}
         </TonConnectUIProvider>
