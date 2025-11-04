@@ -2,7 +2,7 @@
 
 Immutable TON staking pool з підпискою через Stripe (5 €/міс для доступу до аналітики).
 
-## 📊 Current Status - Phase 2 Complete ✅
+## 📊 Current Status - Phase 3 Complete ✅ | Phase 4 Ready 🚀
 
 | Feature | Status | Details |
 |---------|--------|---------|
@@ -10,20 +10,27 @@ Immutable TON staking pool з підпискою через Stripe (5 €/міс
 | **Authentication** | ✅ | Register/Login/Logout, JWT tokens, roles |
 | **TonConnect Wallet** | ✅ | Wallet connection and UI working |
 | **Real Blockchain Data** | ✅ | Pool balance + wallet balance from TON mainnet |
-| **Smart Contract Queries** | ✅ | Methods for staked_amount and rewards (Phase 2) |
-| **Stake Transactions** | 🔧 | In development (Phase 3) |
-| **Admin Panel** | 🔧 | In development |
-| **Email Verification** | 🔧 | TODO |
-| **Deployment** | ✅ | Live on Render |
+| **Smart Contract Queries** | ✅ | Methods for staked_amount and rewards |
+| **Stake Transactions** | ✅ | Real transactions via TonConnect (Phase 3 DONE) |
+| **Unstake Transactions** | ✅ | Withdrawal requests implemented |
+| **Transaction Recording** | ✅ | Database tracking of all transactions |
+| **Deployment** | ✅ | Live on Render (auto-deploys on git push) |
+| **Transaction History** | 🔧 | Phase 4 - TODO |
+| **Status Polling** | 🔧 | Phase 4 - TODO |
+| **Admin Panel** | 🔧 | Phase 4 - TODO |
 
-**Latest Commit:** 6b64e4a - Smart contract query methods implementation
+**Latest Commit:** 87df296 - Fix TypeScript error (SendTransactionResponse type)
+**Overall Progress:** 18/20 (90%)
+**Phase 4 Status:** Ready to start - 6 features planned
 
-### What's New (Nov 4, 2025)
-- ✅ Implemented `get_user_staked_amount()` - queries pool contract
-- ✅ Implemented `get_user_rewards()` - queries accumulated rewards
-- ✅ Updated `/api/user/<address>/balance` to fetch real contract data
-- ✅ Improved error handling and fallback mechanisms
-- ✅ See `SMART_CONTRACT_QUERIES.md` for details
+### What's New (Nov 4, 2025) - PHASE 3 ✅
+- ✅ Real stake transactions via TonConnect wallet
+- ✅ Real unstake/withdrawal requests
+- ✅ Transaction recording in database
+- ✅ API endpoints: prepare-stake, stake, prepare-unstake, unstake
+- ✅ Frontend StakeForm updated with wallet signing
+- ✅ Complete API documentation (PHASE_3_COMPLETE.md)
+- ✅ Testing & deployment guide (PHASE_3_TESTING_GUIDE.md)
 
 ## Огляд проєкту
 
