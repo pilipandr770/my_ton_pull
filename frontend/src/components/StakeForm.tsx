@@ -68,8 +68,8 @@ export default function StakeForm({ apiUrl, userAddress }: StakeFormProps) {
       // Відправляємо транзакцію через TON Connect
       const result = await tonConnectUI.sendTransaction(transaction);
 
-      // Отримуємо tx_hash (залежить від реалізації TonConnect)
-      const txHash = result.boc || result.hash || "pending";
+      // Отримуємо tx_hash з boc (TonConnect повертає boc, не hash)
+      const txHash = result.boc || "pending";
 
       // Записуємо транзакцію на бекенді
       const recordResponse = await fetch(`${apiUrl}/api/transaction/${action}`, {
