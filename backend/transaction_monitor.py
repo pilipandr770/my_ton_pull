@@ -2,13 +2,15 @@
 """
 Background task to monitor transaction status on blockchain
 Polls pending transactions and updates their status
+Sends email notifications for transaction status changes
 """
 
 import os
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
-from models import db, Transaction
+from models import db, Transaction, User
 from ton_api import TONAPIClient
+from email_service import get_email_service
 
 scheduler = None
 _initialized = False
@@ -59,6 +61,7 @@ def poll_pending_transactions():
         print(f"🔄 Checking {len(pending_txs)} pending transactions...")
         
         api_client = TONAPIClient(testnet=False)  # Use mainnet
+        email_service = get_email_service()
         updated_count = 0
         
         for tx in pending_txs:
@@ -75,6 +78,25 @@ def poll_pending_transactions():
                     db.session.add(tx)
                     updated_count += 1
                     print(f"  ✅ TX {tx.tx_hash[:10]}... status: {old_status} → {new_status}")
+                    
+                    # Send email notification
+                    if tx.user_id:
+                        user = User.query.get(tx.user_id)
+                        if user and user.email:
+                            try:
+                                if new_status == 'confirmed':
+                                    email_service.send_transaction_confirmed(
+                                        user.email,
+                                        user.email.split('@')[0],  # Use email prefix as name
+                                        float(tx.amount) if tx.amount else 0,
+                                        tx.tx_hash,
+                                        tx.type
+                                    )
+                                elif new_status == 'failed':
+                                    # Could send failure notification here
+                                    print(f"  ⚠️  TX {tx.tx_hash[:10]}... failed for user {user.email}")
+                            except Exception as e:
+                                print(f"  ❌ Error sending email: {str(e)}")
                     
             except Exception as e:
                 print(f"  ❌ Error checking TX {tx.tx_hash[:10]}...: {str(e)}")

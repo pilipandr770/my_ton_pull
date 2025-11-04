@@ -19,5 +19,9 @@ python-dateutil==2.8.2
 # Background task scheduling
 APScheduler==3.10.4
 
+# Email service
+sendgrid==6.11.0
+Flask-Mail==0.9.1
+
 # security headers
 Flask-Talisman==1.1.0

@@ -25,6 +25,7 @@ from models import db, User, Transaction, PoolStats, Subscription
 from auth import login_required, admin_required, subscription_required
 from ton_api import TONAPIClient, PoolService
 from transaction_monitor import init_scheduler
+from email_service import get_email_service
 
 # --- Env ---------------------------------------------------------------------
 load_dotenv()
@@ -480,6 +481,19 @@ def execute_stake():
         db.session.add(transaction)
         db.session.commit()
         
+        # Send confirmation email
+        try:
+            email_service = get_email_service()
+            email_service.send_stake_confirmation(
+                user.email,
+                user.email.split('@')[0],  # Use email prefix as name
+                amount,
+                tx_hash
+            )
+        except Exception as e:
+            print(f"Warning: Failed to send email: {str(e)}")
+            # Don't fail the transaction if email fails
+        
         return jsonify({
             "status": "recorded",
             "tx_hash": tx_hash,
@@ -551,6 +565,20 @@ def execute_unstake():
         db.session.commit()
         
         withdrawal_info = transaction.get_withdrawal_countdown()
+        
+        # Send unstake confirmation email
+        try:
+            email_service = get_email_service()
+            lock_days = UNSTAKE_LOCK_DURATION // (24 * 3600)  # Convert seconds to days
+            email_service.send_unstake_confirmation(
+                user.email,
+                user.email.split('@')[0],  # Use email prefix as name
+                tx_hash,
+                lock_days
+            )
+        except Exception as e:
+            print(f"Warning: Failed to send email: {str(e)}")
+            # Don't fail the transaction if email fails
         
         return jsonify({
             "status": "recorded",
