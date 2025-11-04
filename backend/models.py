@@ -3,7 +3,7 @@
 Database models for TON Staking Pool
 Uses separate schema 'ton_pool' for multi-project PostgreSQL database
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -108,6 +108,11 @@ class Transaction(db.Model):
     amount_ton = db.Column(db.Float, default=0.0)  # DEPRECATED: use 'amount' instead
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Withdrawal lock fields
+    is_locked = db.Column(db.Boolean, default=False)  # Is withdrawal locked/time-locked
+    lock_duration = db.Column(db.Integer, default=0)  # Lock duration in seconds
+    withdrawal_available_at = db.Column(db.DateTime, nullable=True)  # When user can withdraw
 
     user = db.relationship('User', backref='transactions')
 
@@ -118,6 +123,48 @@ class Transaction(db.Model):
             self.updated_at = datetime.utcnow()
             return True
         return False
+    
+    def set_withdrawal_lock(self, lock_duration_seconds: int):
+        """Set withdrawal lock with specified duration (in seconds)"""
+        self.is_locked = True
+        self.lock_duration = lock_duration_seconds
+        self.withdrawal_available_at = datetime.utcnow() + timedelta(seconds=lock_duration_seconds)
+        return self.withdrawal_available_at
+    
+    def is_withdrawal_available(self) -> bool:
+        """Check if withdrawal is available (lock expired)"""
+        if not self.is_locked:
+            return True
+        if not self.withdrawal_available_at:
+            return True
+        return datetime.utcnow() >= self.withdrawal_available_at
+    
+    def get_withdrawal_countdown(self) -> dict:
+        """Get countdown info for withdrawal lock"""
+        if not self.is_locked or not self.withdrawal_available_at:
+            return {
+                'is_locked': False,
+                'seconds_remaining': 0,
+                'available_at': None,
+                'is_available': True
+            }
+        
+        now = datetime.utcnow()
+        if now >= self.withdrawal_available_at:
+            return {
+                'is_locked': False,
+                'seconds_remaining': 0,
+                'available_at': self.withdrawal_available_at.isoformat(),
+                'is_available': True
+            }
+        
+        seconds_remaining = int((self.withdrawal_available_at - now).total_seconds())
+        return {
+            'is_locked': True,
+            'seconds_remaining': seconds_remaining,
+            'available_at': self.withdrawal_available_at.isoformat(),
+            'is_available': False
+        }
 
     def to_dict(self):
         return {

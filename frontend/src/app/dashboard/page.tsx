@@ -8,6 +8,7 @@ import PoolStats from "@/components/PoolStats";
 import UserBalance from "@/components/UserBalance";
 import StakeForm from "@/components/StakeForm";
 import TonConnectButtonWrapper from "@/components/TonConnectButtonWrapper";
+import WithdrawalTimer from "@/components/WithdrawalTimer";
 import Link from "next/link";
 
 // Use relative URLs for API calls (same server)
@@ -107,6 +108,11 @@ export default function Dashboard() {
         {/* Pool Statistics */}
         <div className="mb-8">
           <PoolStats apiUrl={API_URL} />
+        </div>
+
+        {/* Withdrawal Locks */}
+        <div className="mb-8">
+          <WithdrawalTimer apiUrl={API_URL} token={localStorage.getItem("token")} />
         </div>
 
         {/* User Section - показуємо тільки якщо гаманець підключено */}

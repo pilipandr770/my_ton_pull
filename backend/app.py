@@ -41,6 +41,11 @@ TON_API_CLIENT = TONAPIClient(testnet=False)  # Mainnet
 POOL_ADDRESS = os.getenv("POOL_CONTRACT_ADDRESS", "EQD-AKzjnXxLk8PFyVJvt9sIQW2_MqmSwi5qPfBZbhKT5bXf")  # Default pool address
 POOL_SERVICE = PoolService(POOL_ADDRESS, testnet=False)  # Mainnet
 
+# --- Withdrawal Lock Configuration -------------------------------------------
+# Lock duration for unstake transactions (in seconds)
+UNSTAKE_LOCK_DURATION = 7 * 24 * 3600  # 7 days in seconds
+STAKE_LOCK_DURATION = 0  # No lock for stake (can withdraw anytime after confirmation)
+
 # Абсолютний шлях до зібраного фронтенду (Next export)
 # На локальній машині: /path/to/backend/../frontend/out
 # На Render: /opt/render/project/src/backend/../frontend/out = /opt/render/project/src/frontend/out
@@ -467,6 +472,11 @@ def execute_stake():
             tx_hash=tx_hash,
             status="pending"
         )
+        
+        # Set withdrawal lock for stake (no lock - can withdraw immediately after confirmation)
+        if STAKE_LOCK_DURATION > 0:
+            transaction.set_withdrawal_lock(STAKE_LOCK_DURATION)
+        
         db.session.add(transaction)
         db.session.commit()
         
@@ -531,13 +541,23 @@ def execute_unstake():
             tx_hash=tx_hash,
             status="pending"
         )
+        
+        # Set withdrawal lock for unstake (7 days by default)
+        if UNSTAKE_LOCK_DURATION > 0:
+            withdrawal_available_at = transaction.set_withdrawal_lock(UNSTAKE_LOCK_DURATION)
+            print(f"🔒 Withdrawal locked until: {withdrawal_available_at}")
+        
         db.session.add(transaction)
         db.session.commit()
+        
+        withdrawal_info = transaction.get_withdrawal_countdown()
         
         return jsonify({
             "status": "recorded",
             "tx_hash": tx_hash,
-            "message": "Withdrawal request recorded, coins will be sent after processing"
+            "message": "Withdrawal request recorded, funds locked for processing",
+            "withdrawal_locked_until": withdrawal_info.get("available_at"),
+            "lock_duration_seconds": UNSTAKE_LOCK_DURATION
         }), 200
     except Exception as e:
         print(f"Error recording unstake: {str(e)}")
@@ -703,6 +723,66 @@ def get_transaction_status(tx_hash):
         
     except Exception as e:
         print(f"Error checking transaction status: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/api/withdrawal/<tx_hash>/countdown")
+@login_required
+def get_withdrawal_countdown(tx_hash):
+    """Get withdrawal lock countdown for a transaction"""
+    try:
+        user_id = get_jwt_identity()
+        
+        # Find transaction
+        tx = Transaction.query.filter_by(tx_hash=tx_hash, user_id=user_id).first()
+        if not tx:
+            return jsonify({"error": "Transaction not found"}), 404
+        
+        # Get countdown info
+        countdown = tx.get_withdrawal_countdown()
+        
+        return jsonify({
+            "tx_hash": tx_hash,
+            "type": tx.type,
+            "amount": float(tx.amount) if tx.amount else 0,
+            "withdrawal": countdown,
+            "lock_duration": tx.lock_duration,
+            "created_at": tx.created_at.isoformat() if tx.created_at else None
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting withdrawal countdown: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/api/withdrawal/locked-transactions")
+@login_required
+def get_locked_transactions():
+    """Get all transactions with active withdrawal locks"""
+    try:
+        user_id = get_jwt_identity()
+        
+        # Get all locked transactions for user
+        locked_txs = Transaction.query.filter_by(user_id=user_id, is_locked=True).all()
+        
+        transactions = []
+        for tx in locked_txs:
+            countdown = tx.get_withdrawal_countdown()
+            transactions.append({
+                "tx_hash": tx.tx_hash,
+                "type": tx.type,
+                "amount": float(tx.amount) if tx.amount else 0,
+                "status": tx.status,
+                "withdrawal": countdown,
+                "lock_duration": tx.lock_duration,
+                "created_at": tx.created_at.isoformat() if tx.created_at else None
+            })
+        
+        return jsonify({
+            "locked_transactions": transactions,
+            "count": len(transactions)
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting locked transactions: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
