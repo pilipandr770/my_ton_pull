@@ -785,6 +785,208 @@ def get_locked_transactions():
         print(f"Error getting locked transactions: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+# ----------------------- ADMIN ROUTES ----------------------------------------
+
+@app.get("/api/admin/stats")
+@login_required
+@admin_required
+def get_admin_stats():
+    """Get admin dashboard statistics"""
+    try:
+        # User statistics
+        total_users = User.query.count()
+        active_users = User.query.filter_by(subscription_status='active').count()
+        
+        # Transaction statistics
+        total_transactions = Transaction.query.count()
+        pending_transactions = Transaction.query.filter_by(status='pending').count()
+        confirmed_transactions = Transaction.query.filter_by(status='confirmed').count()
+        failed_transactions = Transaction.query.filter_by(status='failed').count()
+        
+        # Stake/Unstake breakdown
+        stake_transactions = Transaction.query.filter_by(type='stake').count()
+        unstake_transactions = Transaction.query.filter_by(type='unstake').count()
+        
+        # Calculate total volume
+        total_stake_volume = db.session.query(
+            db.func.coalesce(db.func.sum(Transaction.amount), 0)
+        ).filter(Transaction.type == 'stake').scalar() or 0.0
+        
+        total_unstake_volume = db.session.query(
+            db.func.coalesce(db.func.sum(Transaction.amount), 0)
+        ).filter(Transaction.type == 'unstake').scalar() or 0.0
+        
+        # Locked transactions
+        locked_count = Transaction.query.filter_by(is_locked=True).count()
+        
+        # Recent transactions (last 10)
+        recent_txs = Transaction.query.order_by(Transaction.created_at.desc()).limit(10).all()
+        
+        recent_transactions = []
+        for tx in recent_txs:
+            recent_transactions.append({
+                "id": tx.id,
+                "user_id": tx.user_id,
+                "type": tx.type,
+                "amount": float(tx.amount) if tx.amount else 0,
+                "status": tx.status,
+                "tx_hash": tx.tx_hash[:20] + "..." if len(tx.tx_hash) > 20 else tx.tx_hash,
+                "created_at": tx.created_at.isoformat() if tx.created_at else None,
+                "is_locked": tx.is_locked
+            })
+        
+        # Pool statistics
+        pool_stats = PoolStats.query.order_by(PoolStats.updated_at.desc()).first()
+        
+        return jsonify({
+            "users": {
+                "total": total_users,
+                "active_subscriptions": active_users,
+                "inactive": total_users - active_users
+            },
+            "transactions": {
+                "total": total_transactions,
+                "pending": pending_transactions,
+                "confirmed": confirmed_transactions,
+                "failed": failed_transactions
+            },
+            "transaction_types": {
+                "stakes": stake_transactions,
+                "unstakes": unstake_transactions
+            },
+            "volume": {
+                "total_staked_ton": float(total_stake_volume),
+                "total_unstaked_ton": float(total_unstake_volume)
+            },
+            "withdrawal_locks": {
+                "locked_count": locked_count,
+                "unlocked_available": total_transactions - locked_count
+            },
+            "pool": {
+                "total_pool_ton": pool_stats.total_pool_ton if pool_stats else 0.0,
+                "total_jettons": pool_stats.total_jettons if pool_stats else 0.0,
+                "apy": pool_stats.apy if pool_stats else 0.0,
+                "updated_at": pool_stats.updated_at.isoformat() if pool_stats else None
+            },
+            "recent_transactions": recent_transactions,
+            "timestamp": datetime.utcnow().isoformat()
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting admin stats: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/api/admin/users")
+@login_required
+@admin_required
+def get_admin_users():
+    """Get list of all users for admin"""
+    try:
+        page = request.args.get("page", 1, type=int)
+        limit = request.args.get("limit", 20, type=int)
+        
+        # Validate inputs
+        if page < 1:
+            page = 1
+        if limit > 100:
+            limit = 100
+        if limit < 1:
+            limit = 20
+        
+        # Get users with pagination
+        query = User.query.order_by(User.created_at.desc())
+        total_count = query.count()
+        
+        offset = (page - 1) * limit
+        users = query.offset(offset).limit(limit).all()
+        
+        user_list = []
+        for user in users:
+            user_list.append({
+                "id": user.id,
+                "email": user.email,
+                "role": user.role,
+                "subscription_status": user.subscription_status,
+                "subscription_expires_at": user.subscription_expires_at.isoformat() if user.subscription_expires_at else None,
+                "wallet_address": user.wallet_address,
+                "transaction_count": len(user.transactions),
+                "created_at": user.created_at.isoformat()
+            })
+        
+        return jsonify({
+            "users": user_list,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "pages": (total_count + limit - 1) // limit
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting admin users: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/api/admin/transactions")
+@login_required
+@admin_required
+def get_admin_transactions():
+    """Get all transactions for admin"""
+    try:
+        page = request.args.get("page", 1, type=int)
+        limit = request.args.get("limit", 20, type=int)
+        status_filter = request.args.get("status", None, type=str)
+        type_filter = request.args.get("type", None, type=str)
+        
+        # Validate inputs
+        if page < 1:
+            page = 1
+        if limit > 100:
+            limit = 100
+        if limit < 1:
+            limit = 20
+        
+        # Build query
+        query = Transaction.query
+        
+        if status_filter:
+            query = query.filter_by(status=status_filter)
+        if type_filter:
+            query = query.filter_by(type=type_filter)
+        
+        total_count = query.count()
+        
+        # Get transactions with ordering
+        transactions = query.order_by(Transaction.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+        
+        tx_list = []
+        for tx in transactions:
+            tx_list.append({
+                "id": tx.id,
+                "user_id": tx.user_id,
+                "type": tx.type,
+                "amount": float(tx.amount) if tx.amount else 0,
+                "status": tx.status,
+                "tx_hash": tx.tx_hash,
+                "is_locked": tx.is_locked,
+                "withdrawal_available_at": tx.withdrawal_available_at.isoformat() if tx.withdrawal_available_at else None,
+                "created_at": tx.created_at.isoformat() if tx.created_at else None
+            })
+        
+        return jsonify({
+            "transactions": tx_list,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "pages": (total_count + limit - 1) // limit
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting admin transactions: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 # ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
 # Healthcheck
 @app.get("/health")
