@@ -1345,6 +1345,44 @@ def history_page_html():
         print(f"❌ Error serving /history: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/admin")
+def admin_page_html():
+    try:
+        index_path = FRONTEND_OUT / "admin" / "index.html"
+        if not index_path.exists():
+            index_path = FRONTEND_OUT / "admin.html"
+        
+        if index_path.exists():
+            print(f"✅ Serving /admin from {index_path}")
+            result = serve_static_file(index_path, 'text/html')
+            return result if result else (jsonify({"error": "error"}), 500)
+        
+        print(f"❌ Not found: {FRONTEND_OUT / 'admin' / 'index.html'}")
+        print(f"❌ Not found: {FRONTEND_OUT / 'admin.html'}")
+        return jsonify({"error": "not found"}), 404
+    except Exception as e:
+        print(f"❌ Error serving /admin: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/analytics")
+def analytics_page_html():
+    try:
+        index_path = FRONTEND_OUT / "analytics" / "index.html"
+        if not index_path.exists():
+            index_path = FRONTEND_OUT / "analytics.html"
+        
+        if index_path.exists():
+            print(f"✅ Serving /analytics from {index_path}")
+            result = serve_static_file(index_path, 'text/html')
+            return result if result else (jsonify({"error": "error"}), 500)
+        
+        print(f"❌ Not found: {FRONTEND_OUT / 'analytics' / 'index.html'}")
+        print(f"❌ Not found: {FRONTEND_OUT / 'analytics.html'}")
+        return jsonify({"error": "not found"}), 404
+    except Exception as e:
+        print(f"❌ Error serving /analytics: {e}")
+        return jsonify({"error": str(e)}), 500
+
 # 4) Root index
 @app.route("/")
 def index_html():
