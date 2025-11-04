@@ -14,19 +14,21 @@ from email_service import get_email_service
 
 scheduler = None
 _initialized = False
+_app = None  # Store app reference for job context
 
 def init_scheduler(app):
     """Initialize the background scheduler"""
-    global scheduler, _initialized
+    global scheduler, _initialized, _app
     
     if _initialized:
         return
     
+    _app = app
     scheduler = BackgroundScheduler()
     
-    # Add polling job
+    # Add polling job with app context wrapper
     scheduler.add_job(
-        func=poll_pending_transactions,
+        func=_poll_with_context,
         trigger="interval",
         seconds=30,  # Poll every 30 seconds
         id="transaction_poller",
@@ -38,6 +40,15 @@ def init_scheduler(app):
     scheduler.start()
     print("✅ Transaction monitor started (polling every 30s)")
     _initialized = True
+
+def _poll_with_context():
+    """Wrapper to run poll_pending_transactions() with Flask app context"""
+    global _app
+    if _app:
+        with _app.app_context():
+            poll_pending_transactions()
+    else:
+        poll_pending_transactions()
 
 def stop_scheduler():
     """Stop the background scheduler"""
