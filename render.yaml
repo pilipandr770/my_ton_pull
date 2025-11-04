@@ -28,7 +28,7 @@ services:
       
       echo "✅ Build complete: backend + frontend ready"
 
-    startCommand: cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 120 --access-logfile - --error-logfile - app:app
+    startCommand: gunicorn --chdir backend --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 120 --access-logfile - --error-logfile - app:app
 
     envVars:
       # Python/Node versions
