@@ -16,5 +16,8 @@ python-dotenv==1.0.1
 requests==2.32.3
 python-dateutil==2.8.2
 
+# Background task scheduling
+APScheduler==3.10.4
+
 # security headers
 Flask-Talisman==1.1.0

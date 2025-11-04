@@ -116,6 +116,56 @@ class TONAPIClient:
             "limit": limit
         })
     
+    def check_transaction_status(self, tx_hash: str) -> Dict:
+        """
+        Перевірити статус транзакції на blockchain
+        
+        Args:
+            tx_hash: BOC хеш транзакції (Transaction ID з blockchain)
+            
+        Returns:
+            Dict з информацією про транзакцію:
+            {
+                "status": "not_found" | "pending" | "confirmed",
+                "confirmations": int,
+                "block_time": int (unix timestamp),
+                "block_height": int,
+                "fee": int (nanotons),
+                "amount": int (nanotons),
+                "from": str,
+                "to": str,
+                "message": str,
+            }
+        """
+        try:
+            # BOC transactions can be queried directly by hash
+            # We need to search for the transaction in blocks or by hash
+            # TonCenter API doesn't have direct transaction lookup by hash
+            # So we'll return "pending" status since we can't verify yet
+            # Later, we'll need to implement better verification
+            
+            # For now, we return a structure that indicates transaction is still pending
+            # In production, you'd want to implement block explorer integration
+            return {
+                "status": "pending",
+                "confirmations": 0,
+                "block_time": None,
+                "block_height": None,
+                "fee": None,
+                "amount": None,
+                "from": None,
+                "to": None,
+                "message": "Transaction status will be updated when confirmed",
+                "tx_hash": tx_hash
+            }
+        except Exception as e:
+            print(f"Error checking transaction status: {str(e)}")
+            return {
+                "status": "unknown",
+                "error": str(e),
+                "tx_hash": tx_hash
+            }
+    
     def run_get_method(self, address: str, method: str, stack: List = None) -> Dict:
         """
         Виконати get-метод смарт-контракту
@@ -337,6 +387,44 @@ class PoolService:
             return parsed_txs
         except Exception as e:
             return []
+    
+    def check_transaction_confirmed(self, tx_hash: str) -> Dict:
+        """
+        Перевірити, чи підтверджена транзакція на blockchain
+        
+        Args:
+            tx_hash: BOC хеш транзакції
+            
+        Returns:
+            Dict з статусом:
+            {
+                "confirmed": bool,
+                "status": "pending" | "confirmed" | "failed" | "unknown",
+                "message": str
+            }
+        """
+        try:
+            # Спроба перевірити статус транзакції через API
+            status_data = self.api.check_transaction_status(tx_hash)
+            
+            is_confirmed = status_data.get("status") == "confirmed"
+            
+            return {
+                "confirmed": is_confirmed,
+                "status": status_data.get("status", "unknown"),
+                "confirmations": status_data.get("confirmations", 0),
+                "block_time": status_data.get("block_time"),
+                "message": status_data.get("message", ""),
+                "tx_hash": tx_hash
+            }
+        except Exception as e:
+            print(f"Error checking transaction confirmation: {str(e)}")
+            return {
+                "confirmed": False,
+                "status": "unknown",
+                "message": f"Error: {str(e)}",
+                "tx_hash": tx_hash
+            }
     
     def prepare_deposit_transaction(self, user_address: str, amount_ton: float) -> Dict:
         """

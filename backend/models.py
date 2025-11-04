@@ -100,19 +100,33 @@ class Transaction(db.Model):
     __table_args__ = _schema()
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey(f"ton_pool.users.id"), nullable=True, index=True)
-    tx_hash = db.Column(db.String(200), nullable=False, unique=True)
-    direction = db.Column(db.String(10), nullable=False)  # 'deposit' | 'withdraw'
-    amount_ton = db.Column(db.Float, default=0.0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    tx_hash = db.Column(db.String(200), nullable=False, unique=True, index=True)
+    type = db.Column(db.String(20), nullable=False)  # 'stake' | 'unstake'
+    amount = db.Column(db.Float, default=0.0)
+    status = db.Column(db.String(20), default='pending')  # 'pending' | 'confirmed' | 'failed'
+    direction = db.Column(db.String(10), nullable=True)  # DEPRECATED: use 'type' instead
+    amount_ton = db.Column(db.Float, default=0.0)  # DEPRECATED: use 'amount' instead
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = db.relationship('User', backref='transactions')
+
+    def update_status(self, new_status: str):
+        """Update transaction status and timestamp"""
+        if new_status in ['pending', 'confirmed', 'failed']:
+            self.status = new_status
+            self.updated_at = datetime.utcnow()
+            return True
+        return False
 
     def to_dict(self):
         return {
             'id': self.id,
             'user_id': self.user_id,
             'tx_hash': self.tx_hash,
-            'direction': self.direction,
-            'amount_ton': self.amount_ton,
-            'created_at': self.created_at.isoformat()
+            'type': self.type,
+            'amount': self.amount,
+            'status': self.status,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface Transaction {
   id: number;
@@ -81,10 +81,63 @@ export default function TransactionList({
     }
   };
 
+  // Poll for pending transaction status updates
+  const pollTransactionStatus = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      for (const tx of transactions) {
+        if (tx.status === "pending") {
+          const response = await fetch(
+            `${apiUrl}/api/transaction/${tx.tx_hash}/status`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            // Update transaction status locally
+            setTransactions((prev) =>
+              prev.map((t) =>
+                t.tx_hash === tx.tx_hash ? { ...t, status: data.status, updated_at: data.updated_at } : t
+              )
+            );
+          }
+        }
+      }
+    } catch (err) {
+      // Silent error for polling - don't interrupt user experience
+      console.debug("Polling error:", err);
+    }
+  }, [token, transactions, apiUrl]);
+
   useEffect(() => {
     fetchTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, sortBy, order, statusFilter, token]);
+
+  // Set up polling interval for pending transactions
+  useEffect(() => {
+    if (!token || transactions.length === 0) return;
+
+    const hasPendingTransactions = transactions.some(
+      (tx) => tx.status === "pending"
+    );
+
+    if (!hasPendingTransactions) return;
+
+    // Poll every 5 seconds when there are pending transactions
+    const pollingInterval = setInterval(() => {
+      pollTransactionStatus();
+    }, 5000);
+
+    return () => clearInterval(pollingInterval);
+  }, [transactions, token, pollTransactionStatus]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);

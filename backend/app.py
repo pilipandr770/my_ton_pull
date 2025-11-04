@@ -24,6 +24,7 @@ import stripe
 from models import db, User, Transaction, PoolStats, Subscription
 from auth import login_required, admin_required, subscription_required
 from ton_api import TONAPIClient, PoolService
+from transaction_monitor import init_scheduler
 
 # --- Env ---------------------------------------------------------------------
 load_dotenv()
@@ -668,6 +669,42 @@ def get_transaction_history():
         print(f"Error fetching transaction history: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
+@app.get("/api/transaction/<tx_hash>/status")
+@login_required
+def get_transaction_status(tx_hash):
+    """Get current status of a specific transaction"""
+    try:
+        user_id = get_jwt_identity()
+        
+        # Find transaction
+        tx = Transaction.query.filter_by(tx_hash=tx_hash, user_id=user_id).first()
+        if not tx:
+            return jsonify({"error": "Transaction not found"}), 404
+        
+        # Check status on blockchain
+        status_info = POOL_SERVICE.check_transaction_confirmed(tx_hash)
+        
+        # Update transaction status if changed
+        if status_info.get("confirmed"):
+            if tx.status != "confirmed":
+                tx.update_status("confirmed")
+                db.session.commit()
+        
+        return jsonify({
+            "tx_hash": tx_hash,
+            "status": tx.status,
+            "type": tx.type,
+            "amount": float(tx.amount) if tx.amount else 0,
+            "created_at": tx.created_at.isoformat() if tx.created_at else None,
+            "updated_at": tx.updated_at.isoformat() if tx.updated_at else None,
+            "confirmations": status_info.get("confirmations", 0),
+            "message": status_info.get("message", "")
+        }), 200
+        
+    except Exception as e:
+        print(f"Error checking transaction status: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 # ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
 # Healthcheck
 @app.get("/health")
@@ -841,7 +878,7 @@ def index_html():
 
 
 
-# --- Init DB ---
+# --- Init DB & Scheduler ---
 with app.app_context():
     try:
         with db.engine.connect() as conn:
@@ -851,6 +888,13 @@ with app.app_context():
         print("✅ Database schema 'ton_pool' ready")
     except Exception as e:
         print(f"⚠️  Database setup: {e}")
+    
+    # Initialize background transaction monitoring
+    try:
+        init_scheduler(app)
+        print("✅ Transaction monitor scheduler initialized")
+    except Exception as e:
+        print(f"⚠️  Scheduler setup: {e}")
 
 # --- Main ----
 if __name__ == "__main__":
