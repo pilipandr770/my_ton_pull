@@ -1015,6 +1015,179 @@ def get_admin_transactions():
         print(f"Error getting admin transactions: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+# ----------------------- ANALYTICS ROUTES -----------------------------------
+
+@app.get("/api/analytics/staking-trends")
+@login_required
+def get_staking_trends():
+    """Get staking activity trends over last 30 days"""
+    try:
+        from sqlalchemy import func, cast, Date
+        from datetime import datetime, timedelta
+        
+        # Get data from last 30 days
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        
+        # Query stakes by day
+        stake_by_day = db.session.query(
+            cast(Transaction.created_at, Date).label('date'),
+            func.count(Transaction.id).label('count'),
+            func.coalesce(func.sum(Transaction.amount), 0).label('volume')
+        ).filter(
+            Transaction.type == 'stake',
+            Transaction.created_at >= thirty_days_ago
+        ).group_by(
+            cast(Transaction.created_at, Date)
+        ).order_by(
+            cast(Transaction.created_at, Date).asc()
+        ).all()
+        
+        # Query unstakes by day
+        unstake_by_day = db.session.query(
+            cast(Transaction.created_at, Date).label('date'),
+            func.count(Transaction.id).label('count')
+        ).filter(
+            Transaction.type == 'unstake',
+            Transaction.created_at >= thirty_days_ago
+        ).group_by(
+            cast(Transaction.created_at, Date)
+        ).order_by(
+            cast(Transaction.created_at, Date).asc()
+        ).all()
+        
+        # Convert to dictionaries for JSON
+        stakes_dict = {str(row[0]): {'count': row[1], 'volume': float(row[2])} for row in stake_by_day}
+        unstakes_dict = {str(row[0]): {'count': row[1]} for row in unstake_by_day}
+        
+        # Build response with all days
+        trends = []
+        current_date = thirty_days_ago.date()
+        end_date = datetime.utcnow().date()
+        
+        while current_date <= end_date:
+            date_str = str(current_date)
+            trends.append({
+                "date": date_str,
+                "stakes": stakes_dict.get(date_str, {'count': 0, 'volume': 0}),
+                "unstakes": unstakes_dict.get(date_str, {'count': 0})
+            })
+            current_date += timedelta(days=1)
+        
+        return jsonify({
+            "period": "last_30_days",
+            "trends": trends,
+            "timestamp": datetime.utcnow().isoformat()
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting staking trends: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/api/analytics/user-activity")
+@login_required
+def get_user_activity():
+    """Get user activity breakdown"""
+    try:
+        from datetime import datetime, timedelta
+        
+        # Users by activity level (stakes + unstakes)
+        user_activity = db.session.query(
+            User.id,
+            User.email,
+            func.count(Transaction.id).label('transaction_count')
+        ).outerjoin(
+            Transaction, User.id == Transaction.user_id
+        ).group_by(
+            User.id, User.email
+        ).order_by(
+            func.count(Transaction.id).desc()
+        ).limit(20).all()
+        
+        activity_list = []
+        for user_id, email, tx_count in user_activity:
+            activity_list.append({
+                "email": email,
+                "transaction_count": tx_count,
+                "last_seen": "N/A"  # Could be enhanced with last activity timestamp
+            })
+        
+        # Overall stats
+        total_active_users = db.session.query(
+            func.count(db.distinct(Transaction.user_id))
+        ).filter(
+            Transaction.created_at >= datetime.utcnow() - timedelta(days=30)
+        ).scalar() or 0
+        
+        return jsonify({
+            "active_users_last_30_days": total_active_users,
+            "top_users": activity_list,
+            "timestamp": datetime.utcnow().isoformat()
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting user activity: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/api/analytics/distribution")
+@login_required
+def get_rewards_distribution():
+    """Get transaction type distribution and status breakdown"""
+    try:
+        # Transaction type distribution
+        stake_count = Transaction.query.filter_by(type='stake').count() or 0
+        unstake_count = Transaction.query.filter_by(type='unstake').count() or 0
+        
+        total_tx = stake_count + unstake_count or 1  # Avoid division by zero
+        
+        # Status distribution
+        pending_count = Transaction.query.filter_by(status='pending').count() or 0
+        confirmed_count = Transaction.query.filter_by(status='confirmed').count() or 0
+        failed_count = Transaction.query.filter_by(status='failed').count() or 0
+        
+        # Volume by type
+        stake_volume = db.session.query(
+            db.func.coalesce(db.func.sum(Transaction.amount), 0)
+        ).filter(Transaction.type == 'stake').scalar() or 0
+        
+        unstake_volume = db.session.query(
+            db.func.coalesce(db.func.sum(Transaction.amount), 0)
+        ).filter(Transaction.type == 'unstake').scalar() or 0
+        
+        return jsonify({
+            "transaction_types": {
+                "stakes": {
+                    "count": stake_count,
+                    "percentage": round((stake_count / total_tx * 100), 2) if total_tx > 0 else 0,
+                    "volume_ton": float(stake_volume)
+                },
+                "unstakes": {
+                    "count": unstake_count,
+                    "percentage": round((unstake_count / total_tx * 100), 2) if total_tx > 0 else 0,
+                    "volume_ton": float(unstake_volume)
+                }
+            },
+            "status_distribution": {
+                "pending": {
+                    "count": pending_count,
+                    "percentage": round((pending_count / total_tx * 100), 2) if total_tx > 0 else 0
+                },
+                "confirmed": {
+                    "count": confirmed_count,
+                    "percentage": round((confirmed_count / total_tx * 100), 2) if total_tx > 0 else 0
+                },
+                "failed": {
+                    "count": failed_count,
+                    "percentage": round((failed_count / total_tx * 100), 2) if total_tx > 0 else 0
+                }
+            },
+            "total_transactions": total_tx,
+            "timestamp": datetime.utcnow().isoformat()
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting distribution: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 # ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
 # Healthcheck
 @app.get("/health")
