@@ -2,6 +2,29 @@
 
 Immutable TON staking pool з підпискою через Stripe (5 €/міс для доступу до аналітики).
 
+## 📊 Current Status - Phase 2 Complete ✅
+
+| Feature | Status | Details |
+|---------|--------|---------|
+| **Landing Page** | ✅ | Full UX with hero, how-it-works, FAQ |
+| **Authentication** | ✅ | Register/Login/Logout, JWT tokens, roles |
+| **TonConnect Wallet** | ✅ | Wallet connection and UI working |
+| **Real Blockchain Data** | ✅ | Pool balance + wallet balance from TON mainnet |
+| **Smart Contract Queries** | ✅ | Methods for staked_amount and rewards (Phase 2) |
+| **Stake Transactions** | 🔧 | In development (Phase 3) |
+| **Admin Panel** | 🔧 | In development |
+| **Email Verification** | 🔧 | TODO |
+| **Deployment** | ✅ | Live on Render |
+
+**Latest Commit:** 6b64e4a - Smart contract query methods implementation
+
+### What's New (Nov 4, 2025)
+- ✅ Implemented `get_user_staked_amount()` - queries pool contract
+- ✅ Implemented `get_user_rewards()` - queries accumulated rewards
+- ✅ Updated `/api/user/<address>/balance` to fetch real contract data
+- ✅ Improved error handling and fallback mechanisms
+- ✅ See `SMART_CONTRACT_QUERIES.md` for details
+
 ## Огляд проєкту
 
 Цей проєкт реалізує **повністю децентралізований TON стейкінг пул** з наступними характеристиками:
@@ -11,6 +34,7 @@ Immutable TON staking pool з підпискою через Stripe (5 €/міс
 - ✅ **Підписка офчейн**: 5 €/міс через Stripe — доступ до веб-інтерфейсу та аналітики
 - ✅ **Повний контроль користувачів**: тільки deposit → share tokens і withdraw
 - ✅ **Безпека**: без приватних ключів у бекенді, без backdoor функцій
+- ✅ **Real Data**: Queries live TON blockchain for balances and rewards
 
 ## Структура проєкту
 
