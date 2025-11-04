@@ -4,6 +4,12 @@ TON Staking Pool Backend + Static Frontend server
 - Віддає статичний Next.js export з ../frontend/out
 - Поправлений CSP для Next (script/style eval/inline дозволені)
 - API з JWT/Stripe (як було)
+
+🔒 PRODUCTION OPTIMIZATIONS APPLIED:
+  ✅ Phase 4.7: ProxyFix, WebhookEvent idempotency, Flask-Limiter, 1 worker (no duplicate APScheduler)
+  ✅ Commit 712038a: Procfile updated with --workers 1
+  ✅ Session Cookies: SECURE + SAMESITE='Lax' on HTTPS
+  ✅ Rate Limiting: 30/min webhook, 60/min pool, 30/min user endpoints
 """
 import os
 import json
