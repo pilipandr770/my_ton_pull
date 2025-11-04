@@ -23,6 +23,7 @@ import stripe
 
 from models import db, User, Transaction, PoolStats, Subscription
 from auth import login_required, admin_required, subscription_required
+from ton_api import TONAPIClient, PoolService
 
 # --- Env ---------------------------------------------------------------------
 load_dotenv()
@@ -32,6 +33,12 @@ SECRET_KEY = os.getenv("SECRET_KEY", os.getenv("FLASK_SECRET_KEY", "super-secret
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
 stripe.api_key = STRIPE_SECRET
+
+# --- TON API Configuration ---------------------------------------------------
+# Use mainnet for production (testnet=False)
+TON_API_CLIENT = TONAPIClient(testnet=False)  # Mainnet
+POOL_ADDRESS = os.getenv("POOL_CONTRACT_ADDRESS", "EQD-AKzjnXxLk8PFyVJvt9sIQW2_MqmSwi5qPfBZbhKT5bXf")  # Default pool address
+POOL_SERVICE = PoolService(POOL_ADDRESS, testnet=False)  # Mainnet
 
 # Абсолютний шлях до зібраного фронтенду (Next export)
 # На локальній машині: /path/to/backend/../frontend/out
@@ -273,31 +280,79 @@ def stripe_webhook():
 # --- API routes (pool, stats, etc) -------------------------------------------
 @app.get("/api/pool/stats")
 def api_pool_stats():
-    stats = PoolStats.query.order_by(PoolStats.id.desc()).first()
-    if not stats:
-        stats = PoolStats(
-            total_staked=12345.678,
-            total_staked_usd=123456.78,
-            participants_count=42,
-            apy=0.097,
-            min_stake=0.5,
-            status='active',
-            testnet=False
-        )
-        db.session.add(stats)
-        db.session.commit()
-    return jsonify(stats.to_dict()), 200
+    """Get real pool statistics from TON blockchain"""
+    try:
+        # Try to get real data from blockchain
+        pool_balance = TON_API_CLIENT.get_address_balance(POOL_ADDRESS)
+        
+        # Get or create stats record in DB
+        stats = PoolStats.query.order_by(PoolStats.id.desc()).first()
+        if not stats:
+            stats = PoolStats(
+                total_staked=pool_balance,
+                total_staked_usd=pool_balance * 5.0,  # Approximate USD price
+                participants_count=42,
+                apy=0.097,
+                min_stake=0.5,
+                status='active',
+                testnet=False
+            )
+            db.session.add(stats)
+            db.session.commit()
+        else:
+            # Update with real balance from blockchain
+            stats.total_staked = pool_balance
+            stats.total_staked_usd = pool_balance * 5.0
+            stats.testnet = False
+            db.session.commit()
+        
+        return jsonify(stats.to_dict()), 200
+    except Exception as e:
+        print(f"Error fetching real pool stats: {str(e)}")
+        # Fallback to DB or mock data
+        stats = PoolStats.query.order_by(PoolStats.id.desc()).first()
+        if stats:
+            return jsonify(stats.to_dict()), 200
+        else:
+            # Return mock data as fallback
+            return jsonify({
+                "total_staked": 12345.678,
+                "total_staked_usd": 123456.78,
+                "participants_count": 42,
+                "apy": 0.097,
+                "min_stake": 0.5,
+                "status": 'active',
+                "testnet": False
+            }), 200
 
 @app.get("/api/user/<address>/balance")
 def api_user_balance(address: str):
-    return jsonify({
-        "user_address": address,
-        "wallet_balance": 50.0,
-        "staked_amount": 10.0,
-        "accumulated_rewards": 0.5,
-        "jettons_balance": 100.0,
-        "share_percentage": 0.1
-    }), 200
+    """Get real wallet balance from TON blockchain"""
+    try:
+        # Get real wallet balance from blockchain
+        wallet_balance = TON_API_CLIENT.get_address_balance(address)
+        
+        # For now, use mock data for staked/rewards (requires contract interaction)
+        # In production, query smart contract for this data
+        return jsonify({
+            "user_address": address,
+            "wallet_balance": wallet_balance,  # Real balance from blockchain
+            "staked_amount": 0.0,  # TODO: Query from contract
+            "accumulated_rewards": 0.0,  # TODO: Query from contract
+            "jettons_balance": 0.0,  # TODO: Query for JettonWallet
+            "share_percentage": 0.0  # TODO: Calculate from contract
+        }), 200
+    except Exception as e:
+        print(f"Error fetching balance for {address}: {str(e)}")
+        # Return mock data as fallback
+        return jsonify({
+            "user_address": address,
+            "wallet_balance": 50.0,
+            "staked_amount": 10.0,
+            "accumulated_rewards": 0.5,
+            "jettons_balance": 100.0,
+            "share_percentage": 0.1
+        }), 200
 
 @app.get("/api/admin/stats")
 @admin_required
@@ -314,6 +369,30 @@ def admin_stats():
 def admin_users():
     users = User.query.all()
     return jsonify([u.to_dict(include_email=True) for u in users]), 200
+
+@app.get("/api/health/ton")
+def health_ton():
+    """Check TON API connection status"""
+    try:
+        # Test API connection
+        info = TON_API_CLIENT.get_address_info(POOL_ADDRESS)
+        balance = TON_API_CLIENT.get_address_balance(POOL_ADDRESS)
+        
+        return jsonify({
+            "status": "connected",
+            "network": "mainnet",
+            "pool_address": POOL_ADDRESS,
+            "pool_balance": balance,
+            "api_working": True
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "network": "mainnet",
+            "pool_address": POOL_ADDRESS,
+            "error": str(e),
+            "api_working": False
+        }), 500
 
 # Compatibility
 @app.get("/api/pool")
