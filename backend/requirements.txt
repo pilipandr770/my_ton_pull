@@ -25,3 +25,6 @@ Flask-Mail==0.9.1
 
 # security headers
 Flask-Talisman==1.1.0
+
+# Rate limiting
+Flask-Limiter==3.8.0

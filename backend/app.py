@@ -18,6 +18,9 @@ from flask_jwt_extended import (
     jwt_required, get_jwt_identity, get_jwt
 )
 from flask_talisman import Talisman
+from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 import stripe
 
@@ -75,6 +78,17 @@ else:
 # --- App ---------------------------------------------------------------------
 app = Flask(__name__, static_folder=str(FRONTEND_OUT), static_url_path="")
 app.config['SECRET_KEY'] = SECRET_KEY
+
+# 🔐 ProxyFix: handle reverse proxy headers correctly (Render behind proxy)
+# This ensures force_https=True works and URLs are generated with correct scheme/host
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
+
+# HTTPS security configuration
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PREFERRED_URL_SCHEME='https'
+)
 
 # DB config
 if DATABASE_URL:
@@ -151,6 +165,15 @@ Talisman(
     frame_options='DENY',
     referrer_policy='no-referrer',
     session_cookie_secure=True
+)
+
+# 🔐 Rate Limiting: protect against DDoS and abuse
+# Uses IP address as identifier; adjust for proxied environments
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"  # In-memory for single worker; use Redis for multi-worker
 )
 
 # --- Init DB & JWT -----------------------------------------------------------
@@ -240,13 +263,33 @@ def secure_demo():
 
 # --- Stripe webhook -----------------------------------------------------------
 @app.post("/stripe/webhook")
+@limiter.limit("30/minute")
 def stripe_webhook():
+    """
+    Handle Stripe webhook events with idempotency protection
+    Tracks processed events to avoid duplicate processing on retry
+    """
     payload = request.data
     sig = request.headers.get("Stripe-Signature", None)
     try:
         event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
+
+    # ✅ IDEMPOTENCY CHECK: prevent duplicate processing
+    from models import WebhookEvent
+    existing = WebhookEvent.query.filter_by(provider='stripe', event_id=event['id']).first()
+    if existing:
+        print(f"⚠️  Duplicate Stripe event {event['id']} - skipping")
+        return jsonify({"status": "duplicate", "message": "Event already processed"}), 200
+    
+    # Record this event as processed
+    webhook_record = WebhookEvent(
+        provider='stripe',
+        event_id=event['id'],
+        event_type=event['type']
+    )
+    db.session.add(webhook_record)
 
     if event["type"] == "invoice.payment_succeeded":
         invoice = event["data"]["object"]
@@ -282,10 +325,13 @@ def stripe_webhook():
                 user.subscription_expires_at = None
                 db.session.commit()
 
+    # Commit webhook record
+    db.session.commit()
     return jsonify({"status": "success"}), 200
 
 # --- API routes (pool, stats, etc) -------------------------------------------
 @app.get("/api/pool/stats")
+@limiter.limit("60/minute")
 def api_pool_stats():
     """Get real pool statistics from TON blockchain"""
     try:
@@ -333,6 +379,7 @@ def api_pool_stats():
             }), 200
 
 @app.get("/api/user/<address>/balance")
+@limiter.limit("30/minute")
 def api_user_balance(address: str):
     """Get real wallet balance and staking data from TON blockchain"""
     try:

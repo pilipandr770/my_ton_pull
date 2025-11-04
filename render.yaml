@@ -1,4 +1,8 @@
-# render.yaml
+# render.yaml - Production deployment configuration for TON Staking Pool
+# Key optimization: 1 worker to prevent duplicate APScheduler runs
+# Build: combined Python backend + Next.js frontend
+# Secrets: set DATABASE_URL, TON_API_KEY, STRIPE keys via Render Dashboard (NOT in repo)
+
 services:
   - type: web
     name: ton-pool-unified
@@ -8,41 +12,73 @@ services:
     branch: master
 
     buildCommand: |
-      echo "🔧 Installing Python deps"
+      echo "🔧 Installing Python dependencies..."
       pip install --upgrade pip
       pip install -r backend/requirements.txt
-      echo "🔧 Installing Node"
+      
+      echo "🔧 Setting up Node.js..."
       corepack enable || true
       npm --version || true
-      echo "🔧 Building frontend"
+      
+      echo "🔧 Building Next.js frontend..."
       cd frontend
-      npm ci
+      npm ci --no-fund
       npm run build
       cd ..
-      echo "✅ Build done"
+      
+      echo "✅ Build complete: backend + frontend ready"
 
     startCommand: |
       cd backend
-      gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app
+      # ⚠️ IMPORTANT: 1 worker prevents duplicate APScheduler execution
+      # Multiple workers = multiple scheduler instances = duplicate polling
+      exec gunicorn \
+        --bind 0.0.0.0:$PORT \
+        --workers 1 \
+        --worker-class sync \
+        --timeout 120 \
+        --access-logfile - \
+        --error-logfile - \
+        app:app
 
     envVars:
+      # Python/Node versions
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: NODE_VERSION
         value: 20.11.1
+      
+      # Flask configuration
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
         generateValue: true
+      
+      # 🔐 Database (set in Render Dashboard, NOT hardcoded in repo!)
       - key: DATABASE_URL
-        value: postgresql://ittoken_db_user:Xm98VVSZv7cMJkopkdWRkgvZzC7Aly42@dpg-d0visga4d50c73ekmu4g-a.frankfurt-postgres.render.com/ittoken_db
+        sync: false
+      
+      # 🔐 TON API (set in Render Dashboard)
       - key: TON_API_KEY
         sync: false
+      
+      # 🔐 Stripe keys (set in Render Dashboard)
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      
+      # 🔐 SendGrid (set in Render Dashboard if using email)
+      - key: SENDGRID_API_KEY
+        sync: false
+      
+      # Frontend API configuration
       - key: NEXT_PUBLIC_API_URL
-        value: ""
+        value: ""  # Empty = same origin (Render URL)
+      
+      # TON Connect manifest
       - key: NEXT_PUBLIC_TON_MANIFEST_URL
         value: https://ton-connect.github.io/demo-dapp-with-wallet/tonconnect-manifest.json
+    
+    # Auto-deploy on push to master
+    autoDeploy: true

@@ -177,3 +177,26 @@ class Transaction(db.Model):
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+class WebhookEvent(db.Model):
+    """
+    Track processed webhook events for idempotency
+    Prevents duplicate processing if Stripe (or other providers) retries delivery
+    """
+    __tablename__ = 'webhook_events'
+    __table_args__ = _schema()
+    
+    id = db.Column(db.Integer, primary_key=True)
+    provider = db.Column(db.String(32), nullable=False, index=True)  # 'stripe', 'ton', etc.
+    event_id = db.Column(db.String(128), unique=True, nullable=False, index=True)
+    event_type = db.Column(db.String(64), nullable=True)  # e.g., 'invoice.payment_succeeded'
+    processed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'provider': self.provider,
+            'event_id': self.event_id,
+            'event_type': self.event_type,
+            'processed_at': self.processed_at.isoformat() if self.processed_at else None
+        }
