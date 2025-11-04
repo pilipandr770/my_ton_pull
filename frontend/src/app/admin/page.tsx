@@ -65,7 +65,9 @@ export default function AdminPage() {
   const router = useRouter();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [users, setUsers] = useState<User[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [usersLoading, setUsersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,7 +113,7 @@ export default function AdminPage() {
     fetchStats();
   }, [isAuthenticated, user?.role]);
 
-  // Fetch users
+  // Fetch users (reserved for future user management panel)
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "admin") return;
 

@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+
+// Recharts will be available at runtime after npm install
 import {
   LineChart,
   Line,
@@ -31,10 +33,40 @@ interface TrendData {
   };
 }
 
+interface UserActivity {
+  active_users_last_30_days: number;
+  top_users: Array<{
+    email: string;
+    transaction_count: number;
+  }>;
+}
+
+interface TransactionTypeStats {
+  count: number;
+  volume: number;
+}
+
+interface StatusDistribution {
+  count: number;
+  percentage: number;
+}
+
+interface Distribution {
+  transaction_types: {
+    stakes: TransactionTypeStats;
+    unstakes: TransactionTypeStats;
+  };
+  status_distribution: {
+    confirmed: StatusDistribution;
+    pending: StatusDistribution;
+    failed: StatusDistribution;
+  };
+}
+
 interface AnalyticsData {
   stakingTrends?: TrendData[];
-  userActivity?: any;
-  distribution?: any;
+  userActivity?: UserActivity;
+  distribution?: Distribution;
 }
 
 export default function AnalyticsPage() {
@@ -251,8 +283,8 @@ export default function AnalyticsPage() {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, value }: any) =>
-                          `${name}: ${value}`
+                        label={(entry: { name: string; value: number }) =>
+                          `${entry.name}: ${entry.value}`
                         }
                         outerRadius={80}
                         fill="#8884d8"
@@ -286,8 +318,8 @@ export default function AnalyticsPage() {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, value }) =>
-                          `${name}: ${value}`
+                        label={(entry: { name: string; value: number }) =>
+                          `${entry.name}: ${entry.value}`
                         }
                         outerRadius={80}
                         fill="#8884d8"
@@ -400,7 +432,7 @@ export default function AnalyticsPage() {
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                           {analyticsData.userActivity.top_users.map(
-                            (user: any, index: number) => (
+                            (user: typeof analyticsData.userActivity.top_users[0], index: number) => (
                               <tr key={index} className="hover:bg-gray-50">
                                 <td className="px-4 py-2 text-gray-900 font-mono text-xs">
                                   {user.email}
