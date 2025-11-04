@@ -410,9 +410,142 @@ def api_position(address: str):
     }), 200
 
 # Transaction endpoints
+
+@app.post("/api/transaction/prepare-stake")
+@login_required
+def prepare_stake():
+    """Prepare a stake transaction - returns data for TonConnect signing"""
+    try:
+        data = request.get_json(force=True) or {}
+        amount = float(data.get("amount", 0))
+        user_address = data.get("user_address", "")
+        
+        if not amount or not user_address:
+            return jsonify({"error": "Missing amount or user_address"}), 400
+        
+        if amount <= 0:
+            return jsonify({"error": "Amount must be positive"}), 400
+        
+        # Get transaction data from PoolService
+        tx_data = POOL_SERVICE.prepare_deposit_transaction(user_address, amount)
+        
+        return jsonify({
+            "transaction": tx_data,
+            "status": "ready_for_signing",
+            "message": "Ready to be signed by wallet"
+        }), 200
+    except Exception as e:
+        print(f"Error preparing stake: {str(e)}")
+        return jsonify({"error": str(e)}), 400
+
+@app.post("/api/transaction/stake")
+@login_required
+def execute_stake():
+    """Execute a stake transaction - record it in database"""
+    try:
+        data = request.get_json(force=True) or {}
+        tx_hash = data.get("tx_hash", "")
+        amount = float(data.get("amount", 0))
+        user_address = data.get("user_address", "")
+        
+        if not tx_hash or not amount or not user_address:
+            return jsonify({"error": "Missing tx_hash, amount, or user_address"}), 400
+        
+        # Get user from token
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Record transaction in database
+        transaction = Transaction(
+            user_id=user_id,
+            type="stake",
+            amount=amount,
+            tx_hash=tx_hash,
+            status="pending"
+        )
+        db.session.add(transaction)
+        db.session.commit()
+        
+        return jsonify({
+            "status": "recorded",
+            "tx_hash": tx_hash,
+            "amount": amount,
+            "message": "Transaction recorded, waiting for blockchain confirmation"
+        }), 200
+    except Exception as e:
+        print(f"Error recording stake: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+
+@app.post("/api/transaction/prepare-unstake")
+@login_required
+def prepare_unstake():
+    """Prepare an unstake transaction"""
+    try:
+        data = request.get_json(force=True) or {}
+        user_address = data.get("user_address", "")
+        
+        if not user_address:
+            return jsonify({"error": "Missing user_address"}), 400
+        
+        # Get transaction data from PoolService
+        tx_data = POOL_SERVICE.prepare_withdraw_transaction(user_address)
+        
+        return jsonify({
+            "transaction": tx_data,
+            "status": "ready_for_signing",
+            "message": "Ready to be signed by wallet"
+        }), 200
+    except Exception as e:
+        print(f"Error preparing unstake: {str(e)}")
+        return jsonify({"error": str(e)}), 400
+
+@app.post("/api/transaction/unstake")
+@login_required
+def execute_unstake():
+    """Execute an unstake transaction"""
+    try:
+        data = request.get_json(force=True) or {}
+        tx_hash = data.get("tx_hash", "")
+        user_address = data.get("user_address", "")
+        
+        if not tx_hash or not user_address:
+            return jsonify({"error": "Missing tx_hash or user_address"}), 400
+        
+        # Get user from token
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Record transaction in database
+        transaction = Transaction(
+            user_id=user_id,
+            type="unstake",
+            amount=0,  # Unstake doesn't have amount tracked this way
+            tx_hash=tx_hash,
+            status="pending"
+        )
+        db.session.add(transaction)
+        db.session.commit()
+        
+        return jsonify({
+            "status": "recorded",
+            "tx_hash": tx_hash,
+            "message": "Withdrawal request recorded, coins will be sent after processing"
+        }), 200
+    except Exception as e:
+        print(f"Error recording unstake: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+
 @app.post("/api/transaction/prepare")
 def prepare_transaction():
-    """Prepare a transaction (stake or unstake)"""
+    """Legacy endpoint - prepare a transaction (stake or unstake)"""
     data = request.get_json(force=True)
     action = data.get("action", "").lower()  # "stake" or "unstake"
     amount = data.get("amount", 0)
@@ -424,16 +557,24 @@ def prepare_transaction():
     if action not in ["stake", "unstake"]:
         return jsonify({"error": "Invalid action"}), 400
     
-    # Return a mock transaction object
-    # In production, this would prepare a real blockchain transaction
-    return jsonify({
-        "tx_id": f"tx_{hash(address + str(amount))}",
-        "action": action,
-        "amount": amount,
-        "address": address,
-        "status": "pending",
-        "created_at": datetime.utcnow().isoformat()
-    }), 200
+    try:
+        if action == "stake":
+            tx_data = POOL_SERVICE.prepare_deposit_transaction(address, amount)
+        else:  # unstake
+            tx_data = POOL_SERVICE.prepare_withdraw_transaction(address)
+        
+        return jsonify({
+            "tx_id": tx_data.get("tx_hash", f"tx_{hash(address + str(amount))}"),
+            "transaction": tx_data,
+            "action": action,
+            "amount": amount,
+            "address": address,
+            "status": "ready_for_signing",
+            "created_at": datetime.utcnow().isoformat()
+        }), 200
+    except Exception as e:
+        print(f"Error preparing transaction: {str(e)}")
+        return jsonify({"error": str(e)}), 400
 
 # ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
 # Healthcheck

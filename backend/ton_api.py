@@ -341,51 +341,56 @@ class PoolService:
     def prepare_deposit_transaction(self, user_address: str, amount_ton: float) -> Dict:
         """
         Підготувати дані для deposit транзакції
+        Номіноване просто відправляє TON на адресу пулу з op=1
         
         Args:
-            user_address: Адреса користувача
+            user_address: Адреса користувача (user-friendly)
             amount_ton: Сума для стейкінгу в TON
             
         Returns:
-            Dict з даними для транзакції (to, amount, payload)
+            Dict з даними для транзакції (ready for TonConnect signing)
         """
-        # TODO: Сформувати правильний payload для deposit операції
-        # Зараз - базова структура
-        
         amount_nanoton = int(amount_ton * 1_000_000_000)
+        
+        # Simple deposit: send TON to pool with op=1
+        # No payload needed - just send coins with op=1 opcode
+        payload = bytes([0x00, 0x00, 0x00, 0x01])  # op=1
         
         return {
             "to": self.pool_address,
             "amount": str(amount_nanoton),
-            "payload": "",  # TODO: cell with deposit message
+            "payload": payload.hex(),
             "from": user_address,
-            "valid_until": None,  # TODO: додати expiration
-            "type": "deposit"
+            "type": "deposit",
+            "description": f"Stake {amount_ton} TON in pool"
         }
     
-    def prepare_withdraw_transaction(self, user_address: str, amount_ton: float) -> Dict:
+    def prepare_withdraw_transaction(self, user_address: str, amount_ton: float = None) -> Dict:
         """
         Підготувати дані для withdraw транзакції
+        Номіноване відправляє op=2 з limit для обробки запиту на вихід
         
         Args:
-            user_address: Адреса користувача
-            amount_ton: Сума для виведення в TON
+            user_address: Адреса користувача (user-friendly)
+            amount_ton: Сума для виведення (не використовується, опціонально)
             
         Returns:
-            Dict з даними для транзакції
+            Dict з даними для транзакції (ready for TonConnect signing)
         """
-        # TODO: Сформувати правильний payload для withdraw операції
+        # Withdraw: send op=2 with limit parameter
+        # op=2: process withdraw requests (limit=255 means process all)
+        gas_fee = 50_000_000  # 0.05 TON for gas
         
-        amount_nanoton = int(amount_ton * 1_000_000_000)
+        # Build payload: op=2 (4 bytes) + limit=255 (1 byte)
+        payload_data = bytes([0x00, 0x00, 0x00, 0x02]) + bytes([0xFF])  # op=2, limit=255
         
         return {
             "to": self.pool_address,
-            "amount": "50000000",  # Gas fee (0.05 TON)
-            "payload": "",  # TODO: cell with withdraw message + amount
+            "amount": str(gas_fee),
+            "payload": payload_data.hex(),
             "from": user_address,
-            "valid_until": None,
             "type": "withdraw",
-            "withdraw_amount": str(amount_nanoton)
+            "description": "Request withdrawal from pool"
         }
 
 

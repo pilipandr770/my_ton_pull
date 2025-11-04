@@ -28,13 +28,17 @@ export default function StakeForm({ apiUrl, userAddress }: StakeFormProps) {
         throw new Error("Невірна сума");
       }
 
+      // Вибираємо потрібний endpoint
+      const endpoint = action === "deposit" 
+        ? "/api/transaction/prepare-stake"
+        : "/api/transaction/prepare-unstake";
+
       // Отримуємо дані для транзакції з бекенду
-      const response = await fetch(`${apiUrl}/api/transaction/prepare`, {
+      const response = await fetch(`${apiUrl}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_address: userAddress,
-          action,
           amount: amountNum,
         }),
       });
@@ -45,28 +49,54 @@ export default function StakeForm({ apiUrl, userAddress }: StakeFormProps) {
       }
 
       const txData = await response.json();
+      const tx = txData.transaction;
 
-      // Відправляємо транзакцію через TON Connect
+      // Будуємо транзакцію для TON Connect
       const transaction = {
         validUntil: Math.floor(Date.now() / 1000) + 600, // 10 хвилин
         messages: [
           {
-            address: txData.to,
-            amount: txData.amount.toString(),
-            payload: txData.payload || undefined,
+            address: tx.to,
+            amount: tx.amount.toString(),
+            payload: tx.payload || undefined,
           },
         ],
       };
 
+      console.log("Sending transaction:", transaction);
+
+      // Відправляємо транзакцію через TON Connect
       const result = await tonConnectUI.sendTransaction(transaction);
+
+      // Отримуємо tx_hash (залежить від реалізації TonConnect)
+      const txHash = result.boc || result.hash || "pending";
+
+      // Записуємо транзакцію на бекенді
+      const recordResponse = await fetch(`${apiUrl}/api/transaction/${action}`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({
+          tx_hash: txHash,
+          amount: amountNum,
+          user_address: userAddress,
+        }),
+      });
+
+      if (!recordResponse.ok) {
+        const error = await recordResponse.json();
+        throw new Error(error.error || "Failed to record transaction");
+      }
 
       setMessage({
         type: "success",
-        text: `✅ Транзакція відправлена! ${action === "deposit" ? "Депозит" : "Вивід"} ${amount} TON`,
+        text: `✅ Транзакція відправлена! ${action === "deposit" ? "Депозит" : "Вивід"} ${amount} TON (${txHash.substring(0, 10)}...)`,
       });
       setAmount("");
 
-      console.log("Transaction sent:", result);
+      console.log("Transaction result:", result);
     } catch (err) {
       setMessage({
         type: "error",
