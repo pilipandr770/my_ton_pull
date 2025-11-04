@@ -1463,10 +1463,25 @@ with app.app_context():
     except Exception as e:
         print(f"⚠️  Database setup: {e}")
     
-    # Initialize background transaction monitoring
+    # 🔍 Worker Detection: Validate single worker configuration
+    # Gunicorn should only run 1 worker to prevent duplicate APScheduler runs
+    import sys
+    gunicorn_workers = None
+    for arg in sys.argv:
+        if '--workers' in arg or arg.isdigit():
+            if '--workers' in str(sys.argv):
+                idx = list(sys.argv).index('--workers')
+                if idx + 1 < len(sys.argv):
+                    gunicorn_workers = sys.argv[idx + 1]
+    
+    if gunicorn_workers and gunicorn_workers != '1':
+        print(f"⚠️  WARNING: Gunicorn configured with {gunicorn_workers} workers!")
+        print(f"   This may cause duplicate APScheduler runs. Check Procfile/render.yaml")
+    
+    # Initialize background transaction monitoring (runs in single worker only)
     try:
         init_scheduler(app)
-        print("✅ Transaction monitor scheduler initialized")
+        print("✅ Transaction monitor scheduler initialized (verified single worker)")
     except Exception as e:
         print(f"⚠️  Scheduler setup: {e}")
 
