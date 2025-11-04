@@ -576,6 +576,98 @@ def prepare_transaction():
         print(f"Error preparing transaction: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
+@app.get("/api/transaction/history")
+@login_required
+def get_transaction_history():
+    """Get user's transaction history with pagination and sorting"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Get query parameters
+        page = request.args.get("page", 1, type=int)
+        limit = request.args.get("limit", 20, type=int)
+        sort_by = request.args.get("sort_by", "created_at", type=str)  # created_at, amount, type
+        order = request.args.get("order", "desc", type=str)  # asc or desc
+        status_filter = request.args.get("status", None, type=str)  # pending, confirmed, failed
+        
+        # Validate inputs
+        if page < 1:
+            page = 1
+        if limit > 100:
+            limit = 100
+        if limit < 1:
+            limit = 20
+        if sort_by not in ["created_at", "amount", "type"]:
+            sort_by = "created_at"
+        if order not in ["asc", "desc"]:
+            order = "desc"
+        
+        # Build query
+        query = Transaction.query.filter_by(user_id=user_id)
+        
+        # Apply status filter if provided
+        if status_filter:
+            query = query.filter_by(status=status_filter)
+        
+        # Get total count
+        total_count = query.count()
+        
+        # Apply sorting
+        if sort_by == "created_at":
+            if order == "desc":
+                query = query.order_by(Transaction.created_at.desc())
+            else:
+                query = query.order_by(Transaction.created_at.asc())
+        elif sort_by == "amount":
+            if order == "desc":
+                query = query.order_by(Transaction.amount.desc())
+            else:
+                query = query.order_by(Transaction.amount.asc())
+        elif sort_by == "type":
+            if order == "desc":
+                query = query.order_by(Transaction.type.desc())
+            else:
+                query = query.order_by(Transaction.type.asc())
+        
+        # Apply pagination
+        offset = (page - 1) * limit
+        transactions = query.offset(offset).limit(limit).all()
+        
+        # Format response
+        transaction_list = []
+        for tx in transactions:
+            transaction_list.append({
+                "id": tx.id,
+                "type": tx.type,  # "stake" or "unstake"
+                "amount": float(tx.amount) if tx.amount else 0,
+                "status": tx.status,  # "pending", "confirmed", "failed"
+                "tx_hash": tx.tx_hash,
+                "created_at": tx.created_at.isoformat() if tx.created_at else None,
+                "updated_at": tx.updated_at.isoformat() if tx.updated_at else None,
+            })
+        
+        return jsonify({
+            "transactions": transaction_list,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "pages": (total_count + limit - 1) // limit  # Ceiling division
+            },
+            "sort": {
+                "by": sort_by,
+                "order": order
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error fetching transaction history: {str(e)}")
+        return jsonify({"error": str(e)}), 400
+
 # ----------------------- STATIC FRONTEND ROUTES (catch-all at end) -----------
 # Healthcheck
 @app.get("/health")
@@ -716,6 +808,21 @@ def register_page_html():
         return jsonify({"error": "not found"}), 404
     except Exception as e:
         print(f"❌ Error serving /register: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/history")
+def history_page_html():
+    try:
+        index_path = FRONTEND_OUT / "history" / "index.html"
+        if not index_path.exists():
+            index_path = FRONTEND_OUT / "history.html"
+        
+        if index_path.exists():
+            result = serve_static_file(index_path, 'text/html')
+            return result if result else (jsonify({"error": "error"}), 500)
+        return jsonify({"error": "not found"}), 404
+    except Exception as e:
+        print(f"❌ Error serving /history: {e}")
         return jsonify({"error": str(e)}), 500
 
 # 4) Root index
