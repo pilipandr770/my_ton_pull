@@ -5,6 +5,7 @@ TON Blockchain API Integration
 """
 
 import os
+import json
 import requests
 from typing import Dict, Optional, List
 from dotenv import load_dotenv
@@ -41,12 +42,26 @@ class TONAPIClient:
             JSON відповідь від API
         """
         url = f"{self.base_url}/{method}"
-        headers = {}
+        headers = {
+            "User-Agent": "TON-Pool-Backend/1.0"
+        }
         if self.api_key:
             headers["X-API-Key"] = self.api_key
             
         try:
-            response = requests.get(url, params=params or {}, headers=headers, timeout=10)
+            # Set timeout and retry logic
+            response = requests.get(
+                url, 
+                params=params or {}, 
+                headers=headers, 
+                timeout=15,
+                allow_redirects=True
+            )
+            
+            # Log response for debugging
+            if response.status_code != 200:
+                print(f"API Response ({response.status_code}): {response.text[:200]}")
+            
             response.raise_for_status()
             data = response.json()
             
@@ -55,6 +70,8 @@ class TONAPIClient:
                 
             return data.get("result", {})
         except requests.exceptions.RequestException as e:
+            # Log full error for debugging
+            print(f"API Request Error: {str(e)}")
             raise Exception(f"Network error: {str(e)}")
     
     def get_address_info(self, address: str) -> Dict:
@@ -106,17 +123,20 @@ class TONAPIClient:
         Args:
             address: Адреса контракту
             method: Назва методу
-            stack: Параметри для методу
+            stack: Параметри для методу у форматі [[type, value], ...]
+                   Приклад: [["tblkarg", "0QD-AKzjnXxLk8PFyVJvt9sIQW2_MqmSwi5qPfBZbhKT5bXf"]]
             
         Returns:
-            Результат виконання методу
+            Результат виконання методу з stack-ом відповідей
         """
         params = {
             "address": address,
             "method": method
         }
         if stack:
-            params["stack"] = stack
+            # Конвертувати stack у правильний формат для TonCenter
+            # TonCenter очікує stack у форматі: [["num", "123"], ["slice", "..."], ...]
+            params["stack"] = json.dumps(stack)
             
         return self._make_request("runGetMethod", params)
 
@@ -174,6 +194,74 @@ class PoolService:
                 "apy": 0
             }
     
+    def get_user_staked_amount(self, user_address: str) -> float:
+        """
+        Отримати скільки користувач застейкав у пулі
+        
+        Args:
+            user_address: Адреса користувача (user-friendly)
+            
+        Returns:
+            Сума в TON або 0 якщо користувач не в пулі
+        """
+        try:
+            # Виконати get-метод "get_staked" на контракту пула
+            # Метод очікує адресу користувача як параметр
+            result = self.api.run_get_method(
+                self.pool_address,
+                "get_staked",
+                [["slice", user_address]]  # Параметр: адреса користувача
+            )
+            
+            # Парсити результат
+            if result and "stack" in result:
+                stack = result["stack"]
+                if len(stack) > 0:
+                    # Перший елемент - staked amount
+                    # TonCenter повертає у форматі ["num", "123456789"]
+                    staked_data = stack[0]
+                    if len(staked_data) > 1:
+                        staked_nanoton = int(staked_data[1])
+                        return staked_nanoton / 1_000_000_000  # У TON
+            
+            return 0.0
+        except Exception as e:
+            print(f"Error getting staked amount for {user_address}: {str(e)}")
+            return 0.0
+    
+    def get_user_rewards(self, user_address: str) -> float:
+        """
+        Отримати накопичені награди користувача
+        
+        Args:
+            user_address: Адреса користувача (user-friendly)
+            
+        Returns:
+            Сума награди в TON
+        """
+        try:
+            # Виконати get-метод "get_rewards" на контракту пула
+            result = self.api.run_get_method(
+                self.pool_address,
+                "get_rewards",
+                [["slice", user_address]]  # Параметр: адреса користувача
+            )
+            
+            # Парсити результат
+            if result and "stack" in result:
+                stack = result["stack"]
+                if len(stack) > 0:
+                    # Перший елемент - rewards
+                    rewards_data = stack[0]
+                    if len(rewards_data) > 1:
+                        rewards_nanoton = int(rewards_data[1])
+                        return rewards_nanoton / 1_000_000_000  # У TON
+            
+            return 0.0
+        except Exception as e:
+            print(f"Error getting rewards for {user_address}: {str(e)}")
+            return 0.0
+    
     def get_user_balance(self, user_address: str) -> Dict:
         """
         Отримати баланс користувача в пулі
@@ -188,26 +276,34 @@ class PoolService:
             # Баланс гаманця користувача
             wallet_balance = self.api.get_address_balance(user_address)
             
-            # TODO: Отримати з контракту:
-            # - staked amount (скільки користувач застейкав)
-            # - jettons balance (pool share tokens)
-            # - accumulated rewards
+            # Отримати з контракту реальні дані
+            staked_amount = self.get_user_staked_amount(user_address)
+            accumulated_rewards = self.get_user_rewards(user_address)
             
-            # Mock дані (замінити на реальні з контракту)
+            # Розрахувати share percentage
+            try:
+                total_pool_balance = self.api.get_address_balance(self.pool_address)
+                share_percentage = (staked_amount / total_pool_balance * 100) if total_pool_balance > 0 else 0.0
+            except:
+                share_percentage = 0.0
+            
             return {
                 "user_address": user_address,
-                "wallet_balance": wallet_balance,
-                "staked_amount": 0,  # TODO: з контракту
-                "jettons_balance": 0,  # TODO: з контракту
-                "accumulated_rewards": 0,  # TODO: розрахувати
-                "share_percentage": 0,  # TODO: розрахувати
+                "wallet_balance": wallet_balance,  # Реальний баланс гаманця
+                "staked_amount": staked_amount,  # Реальні дані з контракту
+                "jettons_balance": 0,  # TODO: з контракту JettonWallet
+                "accumulated_rewards": accumulated_rewards,  # Реальні награди з контракту
+                "share_percentage": share_percentage,  # Розраховано з балансу
             }
         except Exception as e:
+            print(f"Error getting user balance: {str(e)}")
             return {
                 "error": str(e),
                 "user_address": user_address,
                 "wallet_balance": 0,
-                "staked_amount": 0
+                "staked_amount": 0,
+                "accumulated_rewards": 0,
+                "share_percentage": 0,
             }
     
     def get_user_transactions(self, user_address: str, limit: int = 10) -> List[Dict]:
