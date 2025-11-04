@@ -28,18 +28,7 @@ services:
       
       echo "✅ Build complete: backend + frontend ready"
 
-    startCommand: |
-      cd backend
-      # ⚠️ IMPORTANT: 1 worker prevents duplicate APScheduler execution
-      # Multiple workers = multiple scheduler instances = duplicate polling
-      exec gunicorn \
-        --bind 0.0.0.0:$PORT \
-        --workers 1 \
-        --worker-class sync \
-        --timeout 120 \
-        --access-logfile - \
-        --error-logfile - \
-        app:app
+    startCommand: cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 120 --access-logfile - --error-logfile - app:app
 
     envVars:
       # Python/Node versions
